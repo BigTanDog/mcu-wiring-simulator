@@ -1,8 +1,8 @@
 {
-  "name": "sim-mcu-platform",
+  "name": "mcu-wiring-simulator",
   "private": true,
   "version": "0.1.0",
-  "description": "2D 可视化单片机接线仿真与测试平台（monorepo：apps/* + packages/*）",
+  "description": "2D MCU wiring simulator & validator (monorepo: apps/* + packages/*)",
   "workspaces": [
     "packages/*",
     "apps/*"

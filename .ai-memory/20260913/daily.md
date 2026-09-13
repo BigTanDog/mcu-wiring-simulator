@@ -57,3 +57,18 @@ session-id: 20260913-1704
 - 提交：`ee1f293 docs(W1-W7): 新增技术设计文档（TDD，含现状基线/架构/规范/契约/Wave 计划）`
 - 未完成：W1 起的具体代码改造尚未开始（文档明确 W1 为后续前置）
 - 阻塞：无
+
+## [22:1x] 动作: 实现 MVP（W1–W6：monorepo + 后端 + 前后端联通）
+
+- 文件：`packages/{contracts,definitions,rule-engine}`、`apps/api/**`（NestJS + Prisma）、`apps/web/src/api/**`、`apps/web/src/hooks/useBackendStatus.ts`、`docs/技术设计文档.md §18`
+- 决策：用 **npm workspaces** 替代 pnpm（规模小、零额外安装，缓存/全局目录已在 D 盘）；前端用 vite alias 直连 packages 源码（HMR），后端消费 dist；`VITE_API_MODE=http|mock` 切换数据源（测试固定 mock）
+- 决策：组件从 2 个扩到 5 个（+LED/按键/电阻，电阻用 `passive` 端口角色）；规则从 14 条扩到 16 条（+R-19 LED 限流电阻、R-09 仅输入引脚无内部上拉）；R-12 支持"线上挂真实电阻"判定
+- 踩坑（已修复并写入技术文档 E-14~E-18）：
+  1. SQLite `file:./dev.db` 在 CLI（相对 schema 目录）与运行时（相对进程目录）基准不一致 → PrismaService 统一解析为绝对路径
+  2. **tsx/esbuild 不支持 emitDecoratorMetadata** → NestJS DI 失效（所有访问 this 的接口 500）→ dev 改用 ts-node，测试用 SWC
+  3. 实例/连线库内主键直接用前端局部 id（`c-led`）→ 跨项目主键冲突 → 改为 `scopedId/localIdOf`
+  4. 测试与 dev 共用 SQLite → `database is locked` → 测试独立 `prisma/test.db` + 每次清表
+- 验证：59 例测试全绿（rule-engine 30 / api 14 / web 15）；typecheck 5 个包 0 error；全量构建成功；真实浏览器冒烟 12 项通过且"后端权威校验 · 规则集 rules-112849b"与后端 /version 一致；seed 幂等（6 → 0）
+- 环境：无需额外安装；npm 缓存 `D:\nodejs\node_cache`、全局目录 `D:\nodejs\node_global`（均在 D 盘）；依赖与 SQLite 数据均在项目内（D 盘）
+- 未完成（技术文档 §18.4 登记）：M-01 前端项目 CRUD UI 未接后端（接口已就绪）、M-02 组件仅 5/17、M-03 R-15/R-20 未实现、M-04 性能基准未测、M-05 引脚未人工核对、M-06 撤销重做未实现
+- 阻塞：无

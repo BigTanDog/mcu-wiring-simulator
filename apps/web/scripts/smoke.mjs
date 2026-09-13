@@ -160,6 +160,27 @@ try {
   check('删除项目后从列表消失', afterDelete === 0, `剩余 ${afterDelete} 条`);
 
   await page.getByRole('button', { name: '关闭' }).click();
+  await page.waitForTimeout(500);
+
+  // 8. 组件库覆盖 M-02 新增组件与「通信模块」分组
+  const libText = await page.locator('.sidebar').innerText();
+  const expectedLib = [
+    '通信模块',
+    'HC-SR04 超声波测距',
+    'SG90 舵机',
+    '有源蜂鸣器模块',
+    'USB-TTL 串口模块',
+    'LED 发光二极管',
+    '轻触按键',
+    '电阻（1/4W）',
+  ];
+  const missingLib = expectedLib.filter((name) => !libText.includes(name));
+  check(
+    '组件库包含 M-02 新增组件与通信模块分组',
+    missingLib.length === 0,
+    missingLib.length > 0 ? `缺少: ${missingLib.join('、')}` : `已校验 ${expectedLib.length} 项`,
+  );
+  await page.screenshot({ path: `${OUT_DIR}/08-library.png` });
 } catch (error) {
   check('执行过程无异常', false, error instanceof Error ? error.message : String(error));
 } finally {

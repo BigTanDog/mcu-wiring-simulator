@@ -587,6 +587,51 @@ const R14_I2C_NON_DEFAULT_PINS: Rule = {
   },
 };
 
+const R15_EXTERNAL_POWER: Rule = {
+  meta: {
+    code: 'R-15',
+    name: '大电流负载需独立供电',
+    severity: 'warning',
+    scope: 'component',
+    tags: ['power', 'component-requirement'],
+  },
+  run: ({ instances, connections, defs, nets }) => {
+    const out: Diagnostic[] = [];
+    for (const instance of instances) {
+      const def = defs.get(instance.definitionSlug);
+      // 组件声明式需求驱动（舵机 / 超声波等），不针对具体 slug
+      if (!def || !def.requirements.includes('external-power')) continue;
+      if (satisfiedByConfig(def, instance, 'external-power')) continue;
+
+      const powerPorts = def.ports.filter((port) => port.role === 'power');
+      const connected = powerPorts.filter((port) =>
+        isPortConnected(connections, instance.id, port.id),
+      );
+      if (connected.length === 0) continue;
+
+      // 是否由开发板板载电源引脚供电（板载 LDO 输出电流有限）
+      const fromBoard = connected.some((port) => {
+        const net = netOfPort(nets, instance.id, port.id);
+        return net ? net.pins.some(isPowerPin) : false;
+      });
+      if (!fromBoard) continue;
+
+      out.push({
+        code: 'R-15',
+        severity: 'warning',
+        message: `${instance.label} 的大电流负载由开发板板载电源供电`,
+        suggestion:
+          '舵机/电机/超声波等负载建议使用独立电源并与开发板共地；板载 3V3 输出电流有限（约 600mA），可能导致复位或工作异常（也可在控制面板勾选"已使用独立电源"）。',
+        targets: [
+          { type: 'instance', id: instance.id },
+          ...connected.map((port) => portTarget(instance.id, port.id)),
+        ],
+      });
+    }
+    return out;
+  },
+};
+
 const R16_STRAP_PIN: Rule = {
   meta: {
     code: 'R-16',
@@ -703,6 +748,90 @@ const R19_LED_SERIES_RESISTOR: Rule = {
   },
 };
 
+const R20_UART_CROSS: Rule = {
+  meta: {
+    code: 'R-20',
+    name: '串口 TX/RX 未交叉',
+    severity: 'error',
+    scope: 'connection',
+    tags: ['protocol'],
+  },
+  run: (input) => {
+    const out: Diagnostic[] = [];
+    for (const pair of signalPinPairs(input)) {
+      const port = portOf(pair.def, pair.portId);
+      if (!port || !(port.protocols ?? []).includes('UART')) continue;
+
+      const label = port.name.toUpperCase();
+      const portIsTx = label.includes('TX');
+      const portIsRx = label.includes('RX');
+      if (!portIsTx && !portIsRx) continue;
+
+      const pinIsTx = hasCapability(pair.pin, 'UART0_TX') || hasCapability(pair.pin, 'UART2_TX');
+      const pinIsRx = hasCapability(pair.pin, 'UART0_RX') || hasCapability(pair.pin, 'UART2_RX');
+      // 接到非硬件串口引脚（软串口）不在本规则范围内
+      if (!pinIsTx && !pinIsRx) continue;
+
+      const sameDirection = (portIsTx && pinIsTx) || (portIsRx && pinIsRx);
+      if (!sameDirection) continue;
+
+      const directionLabel = portIsTx ? 'TX' : 'RX';
+      const peer = portIsTx ? 'RX' : 'TX';
+      out.push({
+        code: 'R-20',
+        severity: 'error',
+        message: `${pair.instance.label}.${port.name} 接到了 ${pair.pin.physicalLabel}（同为 ${directionLabel}），两端方向相同无法通信`,
+        suggestion: `串口必须交叉连接：模块 TX → 开发板 RX、模块 RX → 开发板 TX（本端应接 ${peer} 引脚）。`,
+        targets: [
+          pinTarget(pair.pin.id),
+          portTarget(pair.instance.id, pair.portId),
+          { type: 'connection', id: pair.connection.id },
+        ],
+      });
+    }
+    return out;
+  },
+};
+
+const R21_VOLTAGE_MISMATCH: Rule = {
+  meta: {
+    code: 'R-21',
+    name: '5V 信号直连 3.3V 引脚',
+    severity: 'error',
+    scope: 'connection',
+    tags: ['electrical'],
+  },
+  run: (input) => {
+    const out: Diagnostic[] = [];
+    // 5V 逻辑的开发板不存在该风险
+    if (input.board.logicVoltage === '5V') return out;
+
+    for (const pair of signalPinPairs(input)) {
+      const port = portOf(pair.def, pair.portId);
+      if (!port || port.role !== 'signal') continue;
+      if (port.voltageDomain !== '5V') continue;
+      // 输入型端口不会向引脚灌电流（如 HC-SR04 的 TRIG）
+      if (port.direction === 'in') continue;
+      if (pair.pin.voltageDomain !== '3V3') continue;
+      if (satisfiedByConfig(pair.def, pair.instance, 'signal-voltage-match')) continue;
+
+      out.push({
+        code: 'R-21',
+        severity: 'error',
+        message: `${pair.instance.label}.${port.name} 输出 5V 电平，直接接入 3.3V 引脚 ${pair.pin.physicalLabel}`,
+        suggestion:
+          '先用电阻分压（如 1kΩ + 2kΩ）或电平转换模块把 5V 降到 3.3V 再接入；长期直连可能损坏引脚（也可在控制面板勾选"已分压 / 已用电平转换模块"）。',
+        targets: [
+          pinTarget(pair.pin.id),
+          portTarget(pair.instance.id, pair.portId),
+          { type: 'connection', id: pair.connection.id },
+        ],
+      });
+    }
+    return out;
+  },
+};
+
 export const RULES: Rule[] = [
   R01_REQUIRED_PORT,
   R03_PIN_MULTIPLE_USE,
@@ -716,8 +845,11 @@ export const RULES: Rule[] = [
   R12_PULLUP_MISSING,
   R13_I2C_ADDRESS_CONFLICT,
   R14_I2C_NON_DEFAULT_PINS,
+  R15_EXTERNAL_POWER,
   R16_STRAP_PIN,
   R17_UART0_PIN,
   R18_POWER_SHORT,
   R19_LED_SERIES_RESISTOR,
+  R20_UART_CROSS,
+  R21_VOLTAGE_MISMATCH,
 ];

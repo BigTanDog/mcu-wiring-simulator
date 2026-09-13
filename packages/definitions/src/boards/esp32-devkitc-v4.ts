@@ -127,8 +127,8 @@ const rightPins: PinDef[] = [
   },
   gpio({ n: 23, side: RIGHT, order: 2, caps: ['SPI', 'PWM'], note: 'VSPI MOSI' }),
   gpio({ n: 22, side: RIGHT, order: 3, caps: ['I2C_SCL', 'PWM'], note: '默认 I2C SCL' }),
-  gpio({ n: 1, side: RIGHT, order: 4, caps: ['UART0'], note: 'UART0 TXD0，接板载 USB 串口，占用会影响日志与下载' }),
-  gpio({ n: 3, side: RIGHT, order: 5, caps: ['UART0'], note: 'UART0 RXD0，接板载 USB 串口' }),
+  gpio({ n: 1, side: RIGHT, order: 4, caps: ['UART0', 'UART0_TX'], note: 'UART0 TXD0，接板载 USB 串口，占用会影响日志与下载' }),
+  gpio({ n: 3, side: RIGHT, order: 5, caps: ['UART0', 'UART0_RX'], note: 'UART0 RXD0，接板载 USB 串口' }),
   gpio({ n: 21, side: RIGHT, order: 6, caps: ['I2C_SDA', 'PWM'], note: '默认 I2C SDA' }),
   {
     id: 'pin-esp32-gnd-3',
@@ -143,8 +143,8 @@ const rightPins: PinDef[] = [
   gpio({ n: 19, side: RIGHT, order: 8, caps: ['SPI', 'PWM'], note: 'VSPI MISO' }),
   gpio({ n: 18, side: RIGHT, order: 9, caps: ['SPI', 'PWM'], note: 'VSPI CLK' }),
   gpio({ n: 5, side: RIGHT, order: 10, caps: ['SPI', 'STRAP', 'PWM'], note: 'VSPI CS；Strapping 引脚（上电电平）' }),
-  gpio({ n: 17, side: RIGHT, order: 11, caps: ['UART2', 'PWM'], note: 'UART2 TX' }),
-  gpio({ n: 16, side: RIGHT, order: 12, caps: ['UART2', 'PWM'], note: 'UART2 RX' }),
+  gpio({ n: 17, side: RIGHT, order: 11, caps: ['UART2', 'UART2_TX', 'PWM'], note: 'UART2 TX' }),
+  gpio({ n: 16, side: RIGHT, order: 12, caps: ['UART2', 'UART2_RX', 'PWM'], note: 'UART2 RX' }),
   gpio({ n: 4, side: RIGHT, order: 13, caps: ['ADC2', 'TOUCH', 'PWM'], note: 'ADC2_CH0 / TOUCH0' }),
   gpio({
     n: 0,

@@ -57,7 +57,7 @@ export const portOptionDefSchema = z.object({
 export const componentDefSchema = z.object({
   slug: z.string().min(1).max(64),
   displayName: z.string().min(1).max(80),
-  category: z.enum(['mcu', 'sensor', 'display', 'actuator', 'power_passive']),
+  category: z.enum(['mcu', 'sensor', 'communication', 'display', 'actuator', 'power_passive']),
   icon: z.string().min(1).max(16),
   version: z.string().min(1).max(24),
   ports: z.array(portDefSchema).min(1),

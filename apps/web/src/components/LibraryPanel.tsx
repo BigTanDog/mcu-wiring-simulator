@@ -21,13 +21,10 @@ export const LibraryPanel = () => {
         def.slug.toLowerCase().includes(keyword) ||
         def.description.toLowerCase().includes(keyword),
     );
-    const map = new Map<ComponentCategory, typeof COMPONENTS>();
-    for (const def of filtered) {
-      const list = map.get(def.category) ?? [];
-      list.push(def);
-      map.set(def.category, list);
-    }
-    return [...map.entries()];
+    // 按 CATEGORY_LABELS 的键顺序分组，保证菜单顺序稳定（与定义注册顺序无关）
+    return (Object.keys(CATEGORY_LABELS) as ComponentCategory[])
+      .map((category) => [category, filtered.filter((def) => def.category === category)] as const)
+      .filter(([, items]) => items.length > 0);
   }, [query]);
 
   const onDragStart = (event: React.DragEvent<HTMLDivElement>, slug: string) => {
@@ -89,7 +86,8 @@ export const LibraryPanel = () => {
 
       {grouped.length === 0 ? <p className="lib-empty">没有匹配的组件</p> : null}
       <p className="lib-hint">
-        Demo 组件库：ESP32 主控 + DHT11 传感器 + SSD1306 OLED 显示模块（其余组件按产品文档迭代加入）。
+        当前组件库：ESP32 主控 + DHT11 / HC-SR04 传感器 + OLED 显示 + LED / 蜂鸣器 / 舵机执行器 +
+        USB-TTL 通信模块 + 按键 / 电阻基础元件（其余组件按产品文档迭代加入）。
       </p>
     </section>
   );

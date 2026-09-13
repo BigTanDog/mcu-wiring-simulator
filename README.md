@@ -73,7 +73,10 @@
 | R-16 | 占用启动敏感（Strapping）引脚 | 警告 |
 | R-17 | 占用 UART0 串口引脚 | 警告 |
 | R-18 | 电源短路 | 错误 |
+| R-15 | 大电流负载（舵机 / 超声波）需独立供电 | 警告 |
 | R-19 | LED 缺少限流电阻（可被真实电阻元件满足） | 警告 |
+| R-20 | 串口 TX/RX 未交叉（模块 TX 必须接板 RX） | 错误 |
+| R-21 | 5V 信号直连 3.3V 引脚（需分压 / 电平转换） | 错误 |
 
 ## 架构
 
@@ -110,11 +113,12 @@ npm run dev -w @sim/web           # http://127.0.0.1:5180
 
 | 层级 | 命令 | 现状 |
 | --- | --- | --- |
-| 规则引擎单测 | `npm test -w @sim/rule-engine` | 30 例（引脚真实性 + 规则正反例 + 可复现性） |
-| 后端集成测试 | `npm test -w @sim/api` | 14 例（含 409 乐观锁冲突、数据隔离、导入导出往返） |
-| 前端单测 | `npm test -w @sim/web` | 15 例（流程集成 + 引用稳定性 + UI 冒烟） |
-| 真实浏览器冒烟 | `npm run smoke`（前后端需已启动） | 12 项断言，0 控制台错误 |
-| 全量 | `npm test && npm run typecheck && npm run build` | 59 例通过 / 0 error |
+| 规则引擎单测 | `npm test -w @sim/rule-engine` | 39 例（引脚真实性 + 19 条规则正反例 + 可复现性） |
+| 后端集成测试 | `npm test -w @sim/api` | 15 例（含 409 乐观锁冲突、数据隔离、导入导出往返、项目列表） |
+| 前端单测 | `npm test -w @sim/web` | 21 例（流程集成 + 引用稳定性 + 项目管理 + UI 冒烟） |
+| 真实浏览器冒烟 | `npm run smoke`（前后端需已启动） | 17 项断言，0 控制台错误 |
+| 主题可读性扫描 | `node apps/web/scripts/check-contrast.mjs dark\|light` | 低对比度文本 0 项 |
+| 全量 | `npm test && npm run typecheck && npm run build` | 75 例通过 / 0 error |
 
 ## 文档
 
@@ -127,7 +131,7 @@ React 18 · TypeScript 5 · Vite 5 · React Flow 12 · Zustand 5 · NestJS 10 ·
 
 ## 已知限制
 
-- 组件库当前 **1 块开发板 + 5 个组件**（ESP32-DevKitC V4、DHT11、SSD1306 OLED、LED、轻触按键、电阻），按新增组件 SOP 持续补齐
+- 组件库当前 **1 块开发板 + 9 个组件**（ESP32-DevKitC V4、DHT11、HC-SR04 超声波、SSD1306 OLED、LED、轻触按键、有源蜂鸣器、SG90 舵机、USB-TTL 串口模块、电阻），按新增组件 SOP 持续补齐
 - 校验为**接线级**（连通性 / 端口 / 引脚能力），不含固件烧录、CPU 模拟与电气级精确仿真
 - 前端项目管理面板尚未接后端（当前使用 localStorage 自动保存 + JSON 导入导出）
 - 引脚数据由一致性单测保障，尚未与官方手册逐项人工核对（计划项）

@@ -23,6 +23,11 @@ export type Capability =
   | 'SPI'
   | 'UART0'
   | 'UART2'
+  // 串口角色：用于 R-20（TX/RX 必须交叉）判定，仅靠 UART0/UART2 无法区分收发方向
+  | 'UART0_TX'
+  | 'UART0_RX'
+  | 'UART2_TX'
+  | 'UART2_RX'
   | 'STRAP'
   | 'FLASH_RESERVED'
   | 'POWER'
@@ -67,7 +72,13 @@ export interface BoardDef {
  */
 export type PortRole = 'signal' | 'power' | 'ground' | 'passive';
 export type PortDirection = 'in' | 'out' | 'io';
-export type ComponentCategory = 'mcu' | 'sensor' | 'display' | 'actuator' | 'power_passive';
+export type ComponentCategory =
+  | 'mcu'
+  | 'sensor'
+  | 'communication'
+  | 'display'
+  | 'actuator'
+  | 'power_passive';
 
 export interface PortDef {
   id: string;
@@ -86,7 +97,9 @@ export type RequirementKind =
   | 'i2c-pullup'
   | 'led-series-resistor'
   | 'input-pull'
-  | 'signal-voltage-match';
+  | 'signal-voltage-match'
+  /** 大电流负载（舵机/电机/超声波等）：建议独立供电，板载 LDO 电流有限（R-15） */
+  | 'external-power';
 
 export interface PortOptionDef {
   key: string;

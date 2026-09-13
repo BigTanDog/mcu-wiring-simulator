@@ -138,7 +138,7 @@ describe('正确接线（示例项目）', () => {
     expect(RULE_SET_VERSION).toMatch(/^rules-[a-z0-9]+$/);
     const info = getRuleSetInfo();
     expect(info.version).toBe(RULE_SET_VERSION);
-    expect(info.rules.length).toBeGreaterThanOrEqual(16);
+    expect(info.rules.length).toBeGreaterThanOrEqual(19);
     expect(info.rules.find((rule) => rule.code === 'R-01')?.enabled).toBe(true);
   });
 });
@@ -389,5 +389,132 @@ describe('连线启用开关与规则配置', () => {
     );
     expect(overridden.status).toBe('failed');
     expect(overridden.diagnostics.find((item) => item.code === 'R-12')?.severity).toBe('error');
+  });
+});
+
+describe('新增经典组件与规则（R-15 独立供电 / R-20 串口交叉 / R-21 5V 直连）', () => {
+  it('板定义标注 UART 收发角色（R-20 的判定依据）', () => {
+    const hasCap = (label: string, capability: string): boolean =>
+      BOARD.pins.find((pin) => pin.physicalLabel === label)?.capabilities.includes(
+        capability as never,
+      ) ?? false;
+
+    expect(hasCap('GPIO1', 'UART0_TX')).toBe(true);
+    expect(hasCap('GPIO3', 'UART0_RX')).toBe(true);
+    expect(hasCap('GPIO17', 'UART2_TX')).toBe(true);
+    expect(hasCap('GPIO16', 'UART2_RX')).toBe(true);
+  });
+
+  it('组件库包含本批新增的经典组件', () => {
+    const slugs = COMPONENTS.map((def) => def.slug);
+    for (const slug of [
+      'hc-sr04',
+      'servo-sg90',
+      'buzzer-active',
+      'usb-ttl',
+      'dht11',
+      'ssd1306-i2c',
+      'led',
+      'push-button',
+      'resistor',
+    ]) {
+      expect(slugs).toContain(slug);
+    }
+  });
+
+  const sr04Wires = (echoPin: string) => [
+    wire('pin-esp32-5v', 'c-sr04', 'VCC'),
+    wire('pin-esp32-gpio5', 'c-sr04', 'TRIG'),
+    wire(echoPin, 'c-sr04', 'ECHO'),
+    wire('pin-esp32-gnd-1', 'c-sr04', 'GND'),
+  ];
+
+  it('HC-SR04 的 ECHO 直连 GPIO18 → R-21（5V 直连 3.3V）', () => {
+    const sr04 = instance('c-sr04', 'hc-sr04', 'HC-SR04-1', {
+      levelShifted: false,
+      externalSupply: true,
+    });
+    const result = run([sr04], sr04Wires('pin-esp32-gpio18'));
+    const r21 = result.diagnostics.find((item) => item.code === 'R-21');
+    expect(r21?.severity).toBe('error');
+    expect(r21?.message).toContain('GPIO18');
+  });
+
+  it('HC-SR04 勾选"已分压/已电平转换" → 无 R-21', () => {
+    const sr04 = instance('c-sr04', 'hc-sr04', 'HC-SR04-1', {
+      levelShifted: true,
+      externalSupply: true,
+    });
+    expect(codes(run([sr04], sr04Wires('pin-esp32-gpio18')))).not.toContain('R-21');
+  });
+
+  it('SG90 舵机由板载 3V3 供电 → R-15（需独立供电）', () => {
+    const servo = instance('c-servo', 'servo-sg90', 'SG90-1', { externalSupply: false });
+    const result = run(
+      [servo],
+      [
+        wire('pin-esp32-3v3', 'c-servo', 'VCC'),
+        wire('pin-esp32-gpio13', 'c-servo', 'SIG'),
+        wire('pin-esp32-gnd-1', 'c-servo', 'GND'),
+      ],
+    );
+    const r15 = result.diagnostics.find((item) => item.code === 'R-15');
+    expect(r15?.severity).toBe('warning');
+    expect(r15?.message).toContain('SG90-1');
+  });
+
+  it('SG90 勾选"已使用独立电源" → 无 R-15', () => {
+    const servo = instance('c-servo', 'servo-sg90', 'SG90-1', { externalSupply: true });
+    const result = run(
+      [servo],
+      [
+        wire('pin-esp32-3v3', 'c-servo', 'VCC'),
+        wire('pin-esp32-gpio13', 'c-servo', 'SIG'),
+        wire('pin-esp32-gnd-1', 'c-servo', 'GND'),
+      ],
+    );
+    expect(codes(result)).not.toContain('R-15');
+  });
+
+  it('USB-TTL 的 TX 接到开发板 TX 引脚（未交叉）→ R-20', () => {
+    const ttl = instance('c-ttl', 'usb-ttl', 'USB-TTL-1', { voltage: '3V3' });
+    const result = run(
+      [ttl],
+      [
+        wire('pin-esp32-gpio1', 'c-ttl', 'TX'),
+        wire('pin-esp32-gpio3', 'c-ttl', 'RX'),
+        wire('pin-esp32-gnd-1', 'c-ttl', 'GND'),
+      ],
+    );
+    const r20 = result.diagnostics.filter((item) => item.code === 'R-20');
+    expect(r20.length).toBeGreaterThanOrEqual(1);
+    expect(r20[0].message).toContain('GPIO1');
+  });
+
+  it('USB-TTL 正确交叉（TX→GPIO3 / RX→GPIO1）→ 无 R-20', () => {
+    const ttl = instance('c-ttl', 'usb-ttl', 'USB-TTL-1', { voltage: '3V3' });
+    const result = run(
+      [ttl],
+      [
+        wire('pin-esp32-gpio3', 'c-ttl', 'TX'),
+        wire('pin-esp32-gpio1', 'c-ttl', 'RX'),
+        wire('pin-esp32-gnd-1', 'c-ttl', 'GND'),
+      ],
+    );
+    expect(codes(result)).not.toContain('R-20');
+  });
+
+  it('有源蜂鸣器正确接线 → 全部通过', () => {
+    const buzzer = instance('c-bz', 'buzzer-active', '蜂鸣器-1', { triggerLevel: '高电平触发' });
+    const result = run(
+      [buzzer],
+      [
+        wire('pin-esp32-3v3', 'c-bz', 'VCC'),
+        wire('pin-esp32-gpio4', 'c-bz', 'IO'),
+        wire('pin-esp32-gnd-1', 'c-bz', 'GND'),
+      ],
+    );
+    expect(result.status).toBe('passed');
+    expect(result.diagnostics).toHaveLength(0);
   });
 });

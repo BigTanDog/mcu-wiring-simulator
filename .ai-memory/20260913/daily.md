@@ -72,3 +72,11 @@ session-id: 20260913-1704
 - 环境：无需额外安装；npm 缓存 `D:\nodejs\node_cache`、全局目录 `D:\nodejs\node_global`（均在 D 盘）；依赖与 SQLite 数据均在项目内（D 盘）
 - 未完成（技术文档 §18.4 登记）：M-01 前端项目 CRUD UI 未接后端（接口已就绪）、M-02 组件仅 5/17、M-03 R-15/R-20 未实现、M-04 性能基准未测、M-05 引脚未人工核对、M-06 撤销重做未实现
 - 阻塞：无
+
+## [推送准备] 动作: 文档配图 + 英文更名 + 推送准备（阻塞于远程认证）
+
+- 文件：`README.md`（新建）、`docs/images/ui-01~07*.png`（7 张真实浏览器截图）、`apps/web/scripts/capture-docs.mjs`（截图脚本）、docs 两份文档插图、根 `package.json` 更名 `mcu-wiring-simulator`
+- 决策：项目英文名 **mcu-wiring-simulator**（README 标题 `MCU Wiring Simulator`）；截图用 playwright-core + 系统 Chrome（deviceScaleFactor 2，1500×940）
+- 验证：截图脚本执行成功（7 张）；提交 `938bb74`（13 files）；本地共 10 次提交待推送
+- 环境事实：git 身份 `BigTanDog <1397354317@qq.com>`；`credential.helper=manager`（Windows 凭据管理器，位于 D:\Git）
+- **阻塞（需用户处理）**：推送目标未确定——本地无 remote；CNB MCP 的 `API_TOKEN` 在配置中是占位符 `<API_TOKEN_HERE>` → 调用 `cnb_list_repositories` / `cnb_create_repository` 均返回 401 `user is not logged in`。需用户二选一：① 在 CodeBuddy 的 MCP 配置填真实 CNB API_TOKEN（之后我可自动建仓 + 推送）；② 直接给出远程仓库 URL（我执行 `git remote add origin <url>` + `git push -u origin master`，首次可能弹凭据登录窗口）

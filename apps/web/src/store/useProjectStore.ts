@@ -495,3 +495,12 @@ export const useActiveResult = (): ValidationResult | null => {
     [serverResult, localResult],
   );
 };
+
+/**
+ * 仅在开发/测试构建中把 store 句柄挂到 window，供 E2E 脚本构造特定场景
+ * （如"把 DATA 改接到仅输入引脚"）；生产构建不包含该分支。
+ */
+if (import.meta.env.DEV) {
+  (window as unknown as { __SIM_STORE__?: typeof useProjectStore }).__SIM_STORE__ =
+    useProjectStore;
+}

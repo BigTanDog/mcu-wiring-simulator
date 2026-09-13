@@ -4,6 +4,7 @@ import { CanvasArea } from './components/CanvasArea';
 import { InspectorPanel } from './components/InspectorPanel';
 import { LibraryPanel } from './components/LibraryPanel';
 import { ProjectPanel } from './components/ProjectPanel';
+import { ShortcutsPanel } from './components/ShortcutsPanel';
 import { TopBar } from './components/TopBar';
 import { useHotkeys } from './hooks/useHotkeys';
 import { useProjectStore } from './store/useProjectStore';
@@ -38,6 +39,7 @@ export default function App() {
           <CanvasArea />
         </div>
         <ProjectPanel />
+        <ShortcutsPanel />
         {toast ? <div className={`toast toast-${toast.kind}`}>{toast.text}</div> : null}
       </div>
     </ReactFlowProvider>

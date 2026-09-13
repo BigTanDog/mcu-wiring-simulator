@@ -47,6 +47,8 @@ export const CanvasArea = () => {
   const addInstance = useProjectStore((state) => state.addInstance);
   const selectInstance = useProjectStore((state) => state.selectInstance);
   const selectConnection = useProjectStore((state) => state.selectConnection);
+  const selectedInstanceId = useProjectStore((state) => state.selectedInstanceId);
+  const selectedConnectionId = useProjectStore((state) => state.selectedConnectionId);
   const hasRun = useProjectStore((state) => state.hasRun);
   const instanceCount = useProjectStore((state) => state.instances.length);
   const hintDismissed = useProjectStore((state) => state.hintDismissed);
@@ -79,15 +81,19 @@ export const CanvasArea = () => {
         position: { x: 40, y: 24 },
         data: {},
         draggable: true,
+        selected: false,
       },
       ...instances.map((instance) => ({
         id: instance.id,
         type: 'component',
         position: instance.position,
         data: { slug: instance.definitionSlug, label: instance.label },
+        // 必须把选中状态写回受控节点：React Flow 的 deleteKeyCode 只会删除
+        // 「内部认为已选中」的元素，否则按 Backspace/Delete 毫无反应
+        selected: instance.id === selectedInstanceId,
       })),
     ],
-    [instances],
+    [instances, selectedInstanceId],
   );
 
   const edges: Edge[] = useMemo(
@@ -107,9 +113,10 @@ export const CanvasArea = () => {
           className: classes.join(' '),
           animated: conn.kind === 'bus' && conn.enabled,
           data: { kind: conn.kind },
+          selected: conn.id === selectedConnectionId,
         } satisfies Edge;
       }),
-    [connections, index],
+    [connections, index, selectedConnectionId],
   );
 
   const onNodesChange: OnNodesChange = useCallback(

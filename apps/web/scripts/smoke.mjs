@@ -249,6 +249,60 @@ try {
     whyText.replace(/\n/g, ' ').slice(0, 40),
   );
   await page.screenshot({ path: `${OUT_DIR}/11-rule-why.png` });
+
+  // 12. 快捷键说明面板
+  await page.getByRole('button', { name: /快捷键/ }).click();
+  await page.waitForSelector('.shortcuts-modal', { timeout: 5000 });
+  const shortcutsText = await page.locator('.shortcuts-modal').innerText();
+  check(
+    '快捷键面板可打开且内容完整',
+    /撤销/.test(shortcutsText) && /Backspace/.test(shortcutsText) && /Esc/.test(shortcutsText),
+    `${shortcutsText.replace(/\n/g, ' ').slice(0, 40)}`,
+  );
+  await page.screenshot({ path: `${OUT_DIR}/12-shortcuts.png` });
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
+  check(
+    'Esc 可关闭快捷键面板',
+    (await page.locator('.shortcuts-modal').count()) === 0,
+  );
+
+  // 13. 选中反馈 + Backspace 删除 + 撤销恢复（此前受控节点未写回 selected，删除无效）
+  await page.getByRole('button', { name: /载入示例/ }).click();
+  await page.waitForTimeout(500);
+  const nodesBeforeDelete = await page.locator('.react-flow__node').count();
+  await page.locator('.react-flow__node').filter({ hasText: 'DHT11' }).first().click();
+  await page.waitForTimeout(300);
+  const selectedCount = await page.locator('.react-flow__node.selected').count();
+  check('单击节点后有选中反馈', selectedCount === 1, `selected=${selectedCount}`);
+
+  await page.keyboard.press('Backspace');
+  await page.waitForTimeout(400);
+  const nodesAfterDelete = await page.locator('.react-flow__node').count();
+  check(
+    'Backspace 删除选中组件',
+    nodesAfterDelete === nodesBeforeDelete - 1,
+    `${nodesBeforeDelete} → ${nodesAfterDelete}`,
+  );
+
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(400);
+  check(
+    '撤销可恢复被删除的组件',
+    (await page.locator('.react-flow__node').count()) === nodesBeforeDelete,
+  );
+
+  await page.locator('.react-flow__pane').click({ position: { x: 40, y: 40 } });
+  await page.waitForTimeout(300);
+  await page.locator('.react-flow__node').filter({ hasText: 'OLED' }).first().click();
+  await page.waitForTimeout(200);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
+  check(
+    'Esc 取消选中',
+    (await page.locator('.react-flow__node.selected').count()) === 0,
+  );
+  await page.screenshot({ path: `${OUT_DIR}/13-delete-hotkey.png` });
 } catch (error) {
   check('执行过程无异常', false, error instanceof Error ? error.message : String(error));
 } finally {

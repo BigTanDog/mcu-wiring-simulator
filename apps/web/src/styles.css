@@ -936,6 +936,19 @@ button {
   opacity: 0.75;
 }
 
+/* 选中反馈：节点/连线被选中后必须有明显视觉提示（否则 Delete/Backspace 的
+   作用对象不可见，用户会以为快捷键"没反应"） */
+.react-flow__node.selected .board-node,
+.react-flow__node.selected .component-node {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke-width: 4;
+}
+
 /* 深色主题下运行按钮用更深的主色，保证白字对比度达标（亮蓝底白字只有 2.6:1） */
 [data-theme='dark'] .run-btn {
   background: #2f6fed;
@@ -1357,6 +1370,77 @@ button {
 .modal-head h2 {
   margin: 0;
   font-size: 15px;
+}
+
+/* ---------------------------- 快捷键说明面板 ---------------------------- */
+
+.shortcuts-modal {
+  width: min(560px, 92vw);
+}
+
+.shortcut-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.shortcut-group-title {
+  margin: 4px 0 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.shortcut-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  font-size: 12px;
+}
+
+.shortcut-keys {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  min-width: 158px;
+}
+
+.shortcut-keys kbd {
+  padding: 2px 7px;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--panel);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 11px;
+}
+
+.shortcut-desc {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.shortcut-note {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--muted);
 }
 
 .project-current {

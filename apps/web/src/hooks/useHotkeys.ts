@@ -17,6 +17,10 @@ export const useHotkeys = (): void => {
   const runValidation = useProjectStore((state) => state.runValidation);
   const selectInstance = useProjectStore((state) => state.selectInstance);
   const selectConnection = useProjectStore((state) => state.selectConnection);
+  const shortcutsOpen = useProjectStore((state) => state.shortcutsOpen);
+  const setShortcutsOpen = useProjectStore((state) => state.setShortcutsOpen);
+  const projectPanelOpen = useProjectStore((state) => state.projectPanelOpen);
+  const setProjectPanelOpen = useProjectStore((state) => state.setProjectPanelOpen);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -49,6 +53,16 @@ export const useHotkeys = (): void => {
       }
 
       if (event.key === 'Escape') {
+        // 依次处理：关闭打开的弹层 → 取消选中。
+        // 之前只做取消选中，没选中任何东西时按 Esc 就像"没反应"。
+        if (shortcutsOpen) {
+          setShortcutsOpen(false);
+          return;
+        }
+        if (projectPanelOpen) {
+          setProjectPanelOpen(false);
+          return;
+        }
         selectInstance(null);
         selectConnection(null);
       }
@@ -56,5 +70,15 @@ export const useHotkeys = (): void => {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [undo, redo, runValidation, selectInstance, selectConnection]);
+  }, [
+    undo,
+    redo,
+    runValidation,
+    selectInstance,
+    selectConnection,
+    shortcutsOpen,
+    setShortcutsOpen,
+    projectPanelOpen,
+    setProjectPanelOpen,
+  ]);
 };

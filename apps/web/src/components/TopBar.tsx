@@ -13,6 +13,7 @@ export const TopBar = () => {
   const theme = useProjectStore((state) => state.theme);
   const setTheme = useProjectStore((state) => state.setTheme);
   const setProjectPanelOpen = useProjectStore((state) => state.setProjectPanelOpen);
+  const setShortcutsOpen = useProjectStore((state) => state.setShortcutsOpen);
   const { status: backendStatus, info: backendInfo } = useBackendStatus();
   const running = useProjectStore((state) => state.running);
   const runValidation = useProjectStore((state) => state.runValidation);
@@ -108,6 +109,15 @@ export const TopBar = () => {
         aria-label="重做"
       >
         ↷
+      </button>
+
+      <button
+        type="button"
+        className="btn"
+        onClick={() => setShortcutsOpen(true)}
+        title="查看快捷键与操作技巧（也可按 Esc 关闭）"
+      >
+        ⌨ 快捷键
       </button>
 
       <button

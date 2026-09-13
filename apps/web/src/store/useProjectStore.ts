@@ -134,6 +134,8 @@ interface ProjectState {
   hintDismissed: boolean;
   /** 组件库中被折叠的分类（persist 保存，收起后下次打开仍然收起） */
   collapsedGroups: string[];
+  /** 快捷键说明面板是否打开 */
+  shortcutsOpen: boolean;
 
   /* --------------------------- 撤销 / 重做（FR-15） --------------------------- */
   /** 历史栈（仅画布文档；栈顶为最近一次操作前的快照） */
@@ -155,6 +157,7 @@ interface ProjectState {
   setTheme: (theme: 'light' | 'dark') => void;
   dismissHint: () => void;
   toggleGroup: (key: string) => void;
+  setShortcutsOpen: (open: boolean) => void;
   setProjectPanelOpen: (open: boolean) => void;
   refreshProjectList: () => Promise<void>;
   createProjectOnServer: (name: string) => Promise<void>;
@@ -256,6 +259,7 @@ export const useProjectStore = create<ProjectState>()(
       theme: 'light',
       hintDismissed: false,
       collapsedGroups: [],
+      shortcutsOpen: false,
       historyPast: [],
       historyFuture: [],
 
@@ -268,6 +272,7 @@ export const useProjectStore = create<ProjectState>()(
 
       setTheme: (theme) => set({ theme }),
       dismissHint: () => set({ hintDismissed: true }),
+      setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
       toggleGroup: (key) =>
         set((state) => ({
           collapsedGroups: state.collapsedGroups.includes(key)

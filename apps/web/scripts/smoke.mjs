@@ -181,6 +181,38 @@ try {
     missingLib.length > 0 ? `缺少: ${missingLib.join('、')}` : `已校验 ${expectedLib.length} 项`,
   );
   await page.screenshot({ path: `${OUT_DIR}/08-library.png` });
+
+  // 9. 撤销 / 重做（FR-15）：清空画布 → Ctrl+Z 恢复 → Ctrl+Shift+Z 重做
+  await page.getByRole('button', { name: /载入示例/ }).click();
+  await page.waitForTimeout(500);
+  const nodesWithSample = await page.locator('.react-flow__node').count();
+
+  await page.getByRole('button', { name: /清空画布/ }).click();
+  await page.waitForTimeout(400);
+  const nodesAfterClear = await page.locator('.react-flow__node').count();
+  check(
+    '清空画布后仅剩开发板',
+    nodesAfterClear < nodesWithSample,
+    `${nodesWithSample} → ${nodesAfterClear}`,
+  );
+
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(500);
+  const nodesAfterUndo = await page.locator('.react-flow__node').count();
+  check('Ctrl+Z 撤销生效（清空可恢复）', nodesAfterUndo === nodesWithSample, `${nodesAfterClear} → ${nodesAfterUndo}`);
+
+  await page.keyboard.press('Control+Shift+z');
+  await page.waitForTimeout(500);
+  const nodesAfterRedo = await page.locator('.react-flow__node').count();
+  check('Ctrl+Shift+Z 重做生效', nodesAfterRedo === nodesAfterClear, `${nodesAfterUndo} → ${nodesAfterRedo}`);
+
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(500);
+  check(
+    '顶栏撤销按钮在有历史时可用',
+    !(await page.getByRole('button', { name: '撤销' }).isDisabled()),
+  );
+  await page.screenshot({ path: `${OUT_DIR}/09-history.png` });
 } catch (error) {
   check('执行过程无异常', false, error instanceof Error ? error.message : String(error));
 } finally {

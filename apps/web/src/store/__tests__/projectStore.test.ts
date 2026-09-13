@@ -6,7 +6,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { setSimulatedOffline } from '../../api/mockApi';
-import { combineActiveResult, useProjectStore } from '../useProjectStore';
+import { combineActiveResult, resetHistory, useProjectStore } from '../useProjectStore';
 
 const activeResult = () => {
   const state = useProjectStore.getState();
@@ -28,6 +28,8 @@ const reset = () => {
     options: { wifiEnabled: false, mode: 'loose', backendOffline: false },
     hintDismissed: false,
   });
+  // 重置动作本身会留下一条历史记录，清掉以保证用例之间互不影响
+  resetHistory();
 };
 
 describe('项目流程（store 集成）', () => {

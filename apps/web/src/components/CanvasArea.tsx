@@ -19,10 +19,16 @@ import {
   type OnEdgesChange,
   type OnNodesChange,
 } from '@xyflow/react';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import type { EndpointRef } from '@sim/contracts';
 import { useDiagnosticIndex } from '../store/useDiagnostics';
-import { handleIdOf, parseHandleId, useProjectStore } from '../store/useProjectStore';
+import {
+  beginHistoryTransaction,
+  endHistoryTransaction,
+  handleIdOf,
+  parseHandleId,
+  useProjectStore,
+} from '../store/useProjectStore';
 import { BoardNode } from './nodes/BoardNode';
 import { ComponentNode } from './nodes/ComponentNode';
 import { ValidationPanel } from './ValidationPanel';
@@ -47,7 +53,23 @@ export const CanvasArea = () => {
   const dismissHint = useProjectStore((state) => state.dismissHint);
   const theme = useProjectStore((state) => state.theme);
   const index = useDiagnosticIndex();
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, fitView } = useReactFlow();
+
+  // F：适配视图（需要 React Flow 上下文，故放在这里而不是全局快捷键 hook）
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      const target = event.target as HTMLElement | null;
+      const editing =
+        !!target &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+      if (editing) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (event.key.toLowerCase() !== 'f') return;
+      void fitView({ padding: 0.15, maxZoom: 1, duration: 250 });
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [fitView]);
 
   const nodes: Node[] = useMemo(
     () => [
@@ -173,6 +195,9 @@ export const CanvasArea = () => {
         snapGrid={[8, 8]}
         deleteKeyCode={['Delete', 'Backspace']}
         defaultEdgeOptions={{ type: 'bezier' }}
+        /* 拖动组件属于连续操作：整体合并为一步历史，撤销时回到拖动前的位置 */
+        onNodeDragStart={() => beginHistoryTransaction()}
+        onNodeDragStop={() => endHistoryTransaction()}
       >
         <Background
           variant={BackgroundVariant.Dots}

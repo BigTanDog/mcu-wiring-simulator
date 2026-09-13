@@ -20,6 +20,11 @@ export const TopBar = () => {
   const clearProject = useProjectStore((state) => state.clearProject);
   const exportJson = useProjectStore((state) => state.exportJson);
   const importJson = useProjectStore((state) => state.importJson);
+  const undo = useProjectStore((state) => state.undo);
+  const redo = useProjectStore((state) => state.redo);
+  // 只读取布尔值（稳定引用），不要在 selector 内构造对象
+  const canUndo = useProjectStore((state) => state.historyPast.length > 0);
+  const canRedo = useProjectStore((state) => state.historyFuture.length > 0);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const onExport = () => {
@@ -46,7 +51,7 @@ export const TopBar = () => {
         <span className="brand-mark">2D</span>
         <div>
           <div className="brand-title">单片机接线仿真与校验平台</div>
-          <div className="brand-sub">Demo · 数据为模拟，尚未接入真实后端</div>
+          <div className="brand-sub">前后端分离 · 定义与校验由后端服务提供</div>
         </div>
       </div>
 
@@ -83,6 +88,27 @@ export const TopBar = () => {
       </span>
 
       <span className="topbar-spacer" />
+
+      <button
+        type="button"
+        className="btn icon-btn"
+        onClick={undo}
+        disabled={!canUndo}
+        title="撤销（Ctrl/Cmd + Z）"
+        aria-label="撤销"
+      >
+        ↶
+      </button>
+      <button
+        type="button"
+        className="btn icon-btn"
+        onClick={redo}
+        disabled={!canRedo}
+        title="重做（Ctrl/Cmd + Shift + Z）"
+        aria-label="重做"
+      >
+        ↷
+      </button>
 
       <button
         type="button"

@@ -133,6 +133,13 @@ interface ProjectState {
   /** 操作提示是否已被用户手动关闭（persist 保存，关闭后不再出现） */
   hintDismissed: boolean;
 
+  /* --------------------------- 撤销 / 重做（FR-15） --------------------------- */
+  /** 历史栈（仅画布文档；栈顶为最近一次操作前的快照） */
+  historyPast: HistoryEntry[];
+  historyFuture: HistoryEntry[];
+  undo: () => void;
+  redo: () => void;
+
   /* ------------------------- 项目管理（M-01，服务端） ------------------------- */
   /** 当前绑定的服务端项目 id（null = 尚未保存到服务端） */
   currentProjectId: string | null;
@@ -187,6 +194,47 @@ const buildSnapshot = (state: ProjectState): ProjectSnapshot => ({
   options: { wifiEnabled: state.options.wifiEnabled, mode: state.options.mode },
 });
 
+/* --------------------------- 撤销 / 重做（FR-15） --------------------------- */
+
+/**
+ * 历史快照：只覆盖「画布文档」（画布内容 + 名称 + 板型）。
+ * 不记录选中项、校验结果、保存状态等 UI/派生状态 —— 撤销不应改变它们。
+ *
+ * 依赖 store 的不可变更新约定（每次编辑都新建 instances/connections 数组），
+ * 因此这里只保存引用即可；若将来出现原地修改，必须改为深拷贝。
+ */
+export interface HistoryEntry {
+  projectName: string;
+  boardSlug: string;
+  instances: ComponentInstance[];
+  connections: Connection[];
+}
+
+const HISTORY_LIMIT = 30;
+
+const snapshotOf = (state: {
+  projectName: string;
+  boardSlug: string;
+  instances: ComponentInstance[];
+  connections: Connection[];
+}): HistoryEntry => ({
+  projectName: state.projectName,
+  boardSlug: state.boardSlug,
+  instances: state.instances,
+  connections: state.connections,
+});
+
+const sameEntry = (a: HistoryEntry, b: HistoryEntry): boolean =>
+  a.boardSlug === b.boardSlug &&
+  a.instances === b.instances &&
+  a.connections === b.connections;
+
+/** 事务中（如拖动组件）：暂停逐次记录，把「起点快照」作为单独一步 */
+let inTransaction = false;
+let transactionStart: HistoryEntry | null = null;
+/** 抑制记录：undo/redo 与整体替换由内部触发，不能再被记为新历史 */
+let suppressRecord = false;
+
 export const useProjectStore = create<ProjectState>()(
   persist(
     (set, get) => ({
@@ -204,6 +252,8 @@ export const useProjectStore = create<ProjectState>()(
       toast: null,
       theme: 'light',
       hintDismissed: false,
+      historyPast: [],
+      historyFuture: [],
 
       currentProjectId: null,
       currentRevision: 0,
@@ -286,6 +336,8 @@ export const useProjectStore = create<ProjectState>()(
             projectPanelOpen: false,
             projectListLoading: false,
           });
+          // 打开项目属于「切换文档」：旧画布的历史不再适用于新内容
+          resetHistory();
           get().showToast(`已打开项目：${detail.project.name}`);
         } catch (error) {
           set({ projectListLoading: false });
@@ -472,6 +524,40 @@ export const useProjectStore = create<ProjectState>()(
 
       selectInstance: (id) => set({ selectedInstanceId: id }),
       selectConnection: (id) => set({ selectedConnectionId: id }),
+
+      undo: () => {
+        const state = get();
+        const previous = state.historyPast[state.historyPast.length - 1];
+        if (!previous) return;
+        suppressRecord = true;
+        set({
+          historyPast: state.historyPast.slice(0, -1),
+          historyFuture: [...state.historyFuture, snapshotOf(state)].slice(0, HISTORY_LIMIT),
+          ...previous,
+          hasRun: false,
+          selectedInstanceId: null,
+          selectedConnectionId: null,
+        });
+        suppressRecord = false;
+        get().showToast('已撤销上一步操作');
+      },
+
+      redo: () => {
+        const state = get();
+        const next = state.historyFuture[state.historyFuture.length - 1];
+        if (!next) return;
+        suppressRecord = true;
+        set({
+          historyFuture: state.historyFuture.slice(0, -1),
+          historyPast: [...state.historyPast, snapshotOf(state)].slice(-HISTORY_LIMIT),
+          ...next,
+          hasRun: false,
+          selectedInstanceId: null,
+          selectedConnectionId: null,
+        });
+        suppressRecord = false;
+        get().showToast('已重做');
+      },
 
       setOptions: (patch) => {
         set((state) => ({ options: { ...state.options, ...patch }, hasRun: false }));
@@ -665,6 +751,54 @@ export const useProjectStore = create<ProjectState>()(
   ),
 );
 
+/* --------------------- 撤销 / 重做：运行时逻辑（store 之后） --------------------- */
+
+const pushHistoryEntry = (entry: HistoryEntry): void => {
+  useProjectStore.setState((state) => ({
+    historyPast: [...state.historyPast, entry].slice(-HISTORY_LIMIT),
+    historyFuture: [],
+  }));
+};
+
+/** 开始一次连续操作（拖动）：期间的状态变化合并为一步 */
+export const beginHistoryTransaction = (): void => {
+  if (inTransaction) return;
+  inTransaction = true;
+  transactionStart = snapshotOf(useProjectStore.getState());
+};
+
+/** 结束连续操作：若确实发生了变化，把起点快照压入历史 */
+export const endHistoryTransaction = (): void => {
+  if (!inTransaction) return;
+  inTransaction = false;
+  const start = transactionStart;
+  transactionStart = null;
+  if (!start) return;
+  if (sameEntry(start, snapshotOf(useProjectStore.getState()))) return;
+  pushHistoryEntry(start);
+};
+
+/** 清空历史（打开服务端项目等「切换文档」操作） */
+export const resetHistory = (): void => {
+  suppressRecord = true;
+  useProjectStore.setState({ historyPast: [], historyFuture: [] });
+  suppressRecord = false;
+};
+
+/**
+ * 用订阅统一记录历史，而不是在每个 action 里插入调用 ——
+ * 这样后续新增编辑入口不会漏记（与 saveState 的 dirty 标记同一策略）。
+ */
+useProjectStore.subscribe((state, prev) => {
+  if (suppressRecord || inTransaction) return;
+  const changed =
+    state.instances !== prev.instances ||
+    state.connections !== prev.connections ||
+    state.boardSlug !== prev.boardSlug;
+  if (!changed) return;
+  pushHistoryEntry(snapshotOf(prev));
+});
+
 /**
  * 「以服务端为准」的整屏替换（打开项目）调用一次，避免被误标为未保存。
  * 一次性标志：只跳过一次 dirty 标记。
@@ -684,15 +818,18 @@ export const skipNextDirtyMarkOnce = (): void => {
  *  - 新建/打开项目会整体替换画布，调用方需先 skipNextDirtyMarkOnce()。
  */
 useProjectStore.subscribe((state, prev) => {
+  const contentChanged =
+    state.instances !== prev.instances || state.connections !== prev.connections;
+
+  // 只有「画布内容变化」才消耗 skip 标志：否则无关的 setState（历史栈更新、
+  // 选中项变化等）会把标志吃掉，导致整体替换后仍被标记为未保存。
+  if (!contentChanged) return;
+
   if (skipNextDirtyMark) {
     skipNextDirtyMark = false;
     return;
   }
 
-  const contentChanged =
-    state.instances !== prev.instances || state.connections !== prev.connections;
-
-  if (!contentChanged) return;
   if (!state.currentProjectId) return;
   if (state.saveState === 'saving' || state.saveState === 'dirty') return;
 
@@ -733,7 +870,7 @@ export const useActiveResult = (): ValidationResult | null => {
  * 仅在开发/测试构建中把 store 句柄挂到 window，供 E2E 脚本构造特定场景
  * （如"把 DATA 改接到仅输入引脚"）；生产构建不包含该分支。
  */
-if (import.meta.env.DEV) {
+if (import.meta.env.DEV && typeof window !== 'undefined') {
   (window as unknown as { __SIM_STORE__?: typeof useProjectStore }).__SIM_STORE__ =
     useProjectStore;
 }

@@ -228,6 +228,18 @@ button {
   color: var(--primary-dark);
 }
 
+.icon-btn {
+  min-width: 34px;
+  padding: 7px 9px;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .run-btn {
   padding: 8px 18px;
   border: none;

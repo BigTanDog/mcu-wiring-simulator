@@ -5,12 +5,15 @@ import { InspectorPanel } from './components/InspectorPanel';
 import { LibraryPanel } from './components/LibraryPanel';
 import { ProjectPanel } from './components/ProjectPanel';
 import { TopBar } from './components/TopBar';
+import { useHotkeys } from './hooks/useHotkeys';
 import { useProjectStore } from './store/useProjectStore';
 
 export default function App() {
   const toast = useProjectStore((state) => state.toast);
   const clearToast = useProjectStore((state) => state.clearToast);
   const theme = useProjectStore((state) => state.theme);
+
+  useHotkeys();
 
   useEffect(() => {
     if (!toast) return undefined;

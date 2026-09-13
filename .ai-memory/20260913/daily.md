@@ -73,6 +73,16 @@ session-id: 20260913-1704
 - 未完成（技术文档 §18.4 登记）：M-01 前端项目 CRUD UI 未接后端（接口已就绪）、M-02 组件仅 5/17、M-03 R-15/R-20 未实现、M-04 性能基准未测、M-05 引脚未人工核对、M-06 撤销重做未实现
 - 阻塞：无
 
+## [00:3x] 动作: 撤销/重做与快捷键（FR-15，已完成，待推送）
+
+- 提交：`2bec6a2`（累计 **7 个提交待推送**：aa20e29 / 5c74f5c / f9da308 / 0c2244c / e7f7173 / 04206af / 2bec6a2）
+- 实现决策（重要）：历史用**订阅式记录**（不逐个 action 插桩 → 未来新增编辑入口不会漏记，与 saveState 的 dirty 标记同策略）；连续操作（拖动）用 `beginHistoryTransaction()/endHistoryTransaction()` 合并为一步；上限 30 步；`undo/redo` 为 store action，撤销后清空选中项并置 `hasRun=false`；打开服务端项目时 `resetHistory()`（切换文档语义）
+- UI：顶栏 ↶/↷ 按钮（disabled 态）；快捷键 `Ctrl/Cmd+Z`、`Ctrl/Cmd+Shift+Z`、`Ctrl+Y`、`Ctrl/Cmd+Enter`、`Esc`（`hooks/useHotkeys.ts`）、`F` 适配视图（画布内注册，需 React Flow 上下文）；输入框内一律不拦截
+- 过程中修掉两个既存缺陷：① `skipNextDirtyMark` 原为「任意一次 setState 就消耗」→ 历史栈的内部 setState 会吃掉标志导致打开项目被误标 dirty，改为「仅画布内容变化时消耗」；② dev-only `window.__SIM_STORE__` 加 `typeof window !== 'undefined'` 保护（Node 环境跑测试直接崩）
+- 后端重启：packages 重建后旧 api 进程仍报 5 组件/16 规则 → 重启后为 **9 组件 / 19 规则**，规则集版本 `rules-1cglo6`（与前端一致）
+- 验证：**87 例全绿**（rule-engine 39 / api 15 / web 33，本轮 web +12）、冒烟 **21 项**（含清空→撤销→重做→按钮状态）、typecheck 0 error、全量构建成功
+- 文档：TDD §7.4（撤销/重做与快捷键标为已实现）、§18 进展/门禁、README 核心能力与操作流程同步
+
 ## [00:0x] 动作: UI 修复（提示/深色黑字）+ M-02 组件补齐（已完成，待推送）
 
 - 提交：`0c2244c`（UI 修复）、`e7f7173`（M-02）——**仍未推送**（GitHub `Failed to connect`，累计 5 个提交待推：aa20e29 / 5c74f5c / f9da308 / 0c2244c / e7f7173）

@@ -13,3 +13,12 @@
 - 验证：89 例全绿（rule-engine 41 / api 15 / web 33）、冒烟 25 项（+4）、typecheck 0 error、构建成功
 - 推送：**GitHub 恢复，积压提交全部推送成功**（`04206af..45615d8`）
 - 阻塞：无
+
+## [01:1x] 动作: 快捷键面板 + 删除失效修复（提交 984ef7f，已推送）
+
+- 需求：① 顶栏加快捷键说明；② Esc 好像没反应；③ 删除改到 Backspace
+- 根因（②③ 同源，真缺陷）：受控 `nodes`/`edges` 没有写回 `selected` → React Flow 的 `deleteKeyCode` 认为"无选中元素"，所以 Backspace/Delete 无效；Esc 本身有效（取消选中）但用户未选中任何元素时看不出效果
+- 修复：`nodes` 写回 `selected: instance.id === selectedInstanceId`、`edges` 同理；补选中态样式（`.react-flow__node.selected .board-node` outline + `.react-flow__edge.selected .react-flow__edge-path` 加粗）；Esc 改为逐层退出（关快捷键面板 → 关项目面板 → 取消选中）
+- 新增：`ShortcutsPanel.tsx`（顶栏「⌨ 快捷键」，三组快捷键与操作技巧，Esc/遮罩关闭）+ store `shortcutsOpen`
+- 验证：冒烟 31 项全绿（新增 6 项：面板内容、Esc 关面板、选中反馈 selected=1、Backspace 删除 3→2、撤销恢复、Esc 取消选中）；89 例单测；typecheck 0 error；构建成功
+- 文档：README（核心能力 + 测试表）、TDD §7.4/§18 同步；MEMORY.md 新增「React Flow 受控模式约定」

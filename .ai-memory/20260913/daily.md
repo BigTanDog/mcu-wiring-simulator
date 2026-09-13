@@ -73,6 +73,15 @@ session-id: 20260913-1704
 - 未完成（技术文档 §18.4 登记）：M-01 前端项目 CRUD UI 未接后端（接口已就绪）、M-02 组件仅 5/17、M-03 R-15/R-20 未实现、M-04 性能基准未测、M-05 引脚未人工核对、M-06 撤销重做未实现
 - 阻塞：无
 
+## [23:5x] 动作: UI 微调 + M-01 项目管理（已完成，待推送）
+
+- 提交：`aa20e29`（UI 微调）、`5c74f5c`（M-01）——**均未推送**（GitHub 网络 `Connection was reset`，重试 3 次失败）
+- UI 微调：运行后隐藏操作提示；亮色主题整体降亮度（`--bg: #e7ecf3`）；新增深色主题（顶栏切换 + persist）并适配 React Flow 控件；硬编码颜色全部改为 CSS 变量
+- M-01：后端 `GET /projects`（ownerKey 隔离 + 计数摘要）；前端 `ProjectPanel`（新建/列表/打开/删除/保存 + 409 冲突"覆盖保存"）；store 增加 currentProjectId/currentRevision/saveState/projectList + 6 个 action；mock 用 localStorage 模拟服务端并返回 409
+- 踩坑（已写入技术文档 E-19~E-21）：① mock 离线开关是模块级状态，测试 reset 未重置导致后续用例"后端不可用"；② dirty 标记误把改名/打开项目算作内容变更 → 只跟踪 instances/connections + `skipNextDirtyMarkOnce`；③ 新建项目后自动关面板与预期不符 → 保持打开
+- 验证：66 例测试全绿（rule-engine 30 / api 15 / web 21）；冒烟 16 项（+4 面板断言）0 控制台错误；typecheck 0 error；全量构建成功；新增主题配图（ui-08/09/10）
+- 待办：网络恢复后 `git push origin master`（本地领先 2 个提交）
+
 ## [推送准备] 动作: 文档配图 + 英文更名 + 推送准备（阻塞于远程认证）
 
 - 文件：`README.md`（新建）、`docs/images/ui-01~07*.png`（7 张真实浏览器截图）、`apps/web/scripts/capture-docs.mjs`（截图脚本）、docs 两份文档插图、根 `package.json` 更名 `mcu-wiring-simulator`

@@ -17,3 +17,6 @@ coverage/
 *.db
 *.db-journal
 apps/api/prisma/*.db*
+
+# 本地留存文档：AI 编程流程文档（用户要求不推送到远程）
+/AI编程流程文档.md

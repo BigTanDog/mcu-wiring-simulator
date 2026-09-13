@@ -15,7 +15,13 @@
     "isolatedModules": true,
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true,
-    "types": ["vite/client"]
+    "types": ["vite/client", "node"],
+    "baseUrl": ".",
+    "paths": {
+      "@sim/contracts": ["../../packages/contracts/src/index.ts"],
+      "@sim/definitions": ["../../packages/definitions/src/index.ts"],
+      "@sim/rule-engine": ["../../packages/rule-engine/src/index.ts"]
+    }
   },
   "include": ["src", "vite.config.ts"]
 }

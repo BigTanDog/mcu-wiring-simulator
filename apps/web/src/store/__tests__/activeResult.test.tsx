@@ -10,7 +10,7 @@
  */
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { ValidationResult } from '../../definitions/types';
+import type { ValidationResult } from '@sim/contracts';
 import { useActiveResult, useProjectStore } from '../useProjectStore';
 
 const localResult: ValidationResult = {

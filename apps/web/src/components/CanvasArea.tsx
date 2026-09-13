@@ -20,7 +20,7 @@ import {
   type OnNodesChange,
 } from '@xyflow/react';
 import { useCallback, useMemo } from 'react';
-import type { EndpointRef } from '../definitions/types';
+import type { EndpointRef } from '@sim/contracts';
 import { useDiagnosticIndex } from '../store/useDiagnostics';
 import { handleIdOf, parseHandleId, useProjectStore } from '../store/useProjectStore';
 import { BoardNode } from './nodes/BoardNode';

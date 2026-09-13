@@ -1,0 +1,18 @@
+{
+  "name": "sim-mcu-platform",
+  "private": true,
+  "version": "0.1.0",
+  "description": "2D 可视化单片机接线仿真与测试平台（monorepo：apps/* + packages/*）",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build:packages": "npm run build -w @sim/contracts && npm run build -w @sim/definitions && npm run build -w @sim/rule-engine",
+    "dev:packages": "npm run dev -w @sim/contracts & npm run dev -w @sim/definitions & npm run dev -w @sim/rule-engine",
+    "build": "npm run build:packages && npm run build -w @sim/api && npm run build -w @sim/web",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "smoke": "npm run smoke -w @sim/web"
+  }
+}

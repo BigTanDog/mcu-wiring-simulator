@@ -3,9 +3,8 @@
  * 数据来自 definitions（声明式），新增组件无需改动本组件代码。
  */
 import { useMemo, useState } from 'react';
-import { CATEGORY_LABELS, COMPONENTS } from '../definitions/components';
-import { ESP32_DEVKITC_V4 } from '../definitions/esp32';
-import type { ComponentCategory } from '../definitions/types';
+import { CATEGORY_LABELS, COMPONENTS, ESP32_DEVKITC_V4 } from '@sim/definitions';
+import type { ComponentCategory } from '@sim/contracts';
 import { useProjectStore } from '../store/useProjectStore';
 
 export const LibraryPanel = () => {

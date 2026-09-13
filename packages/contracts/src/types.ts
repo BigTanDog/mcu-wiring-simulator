@@ -1,7 +1,11 @@
 /**
- * 领域模型类型定义（对齐 docs/产品计划文档.md 第 8、11 章的数据模型草案）
- * Demo 阶段：仅使用其中与"画布 + 校验"直接相关的子集。
+ * 领域模型类型定义（前后端唯一真相源）
+ *
+ * 来源：由 apps/web/src/definitions/types.ts 上提（W1），并追加 API 契约类型。
+ * 对应文档：docs/技术设计文档.md §4.1、§9.1。
  */
+
+/* ------------------------------ 开发板 / 引脚 ------------------------------ */
 
 export type VoltageDomain = '3V3' | '5V' | 'GND';
 
@@ -54,9 +58,16 @@ export interface BoardDef {
   pins: PinDef[];
 }
 
-export type PortRole = 'signal' | 'power' | 'ground';
+/* -------------------------------- 组件定义 -------------------------------- */
+
+/**
+ * 端口角色：
+ *  - passive 表示无源元件（电阻、电容等）的引脚——它既可接信号也可接电源，
+ *    因此 R-05（信号接电源）与 R-08（仅输入引脚驱动）必须跳过 passive 端口。
+ */
+export type PortRole = 'signal' | 'power' | 'ground' | 'passive';
 export type PortDirection = 'in' | 'out' | 'io';
-export type ComponentCategory = 'mcu' | 'sensor' | 'display' | 'actuator';
+export type ComponentCategory = 'mcu' | 'sensor' | 'display' | 'actuator' | 'power_passive';
 
 export interface PortDef {
   id: string;
@@ -70,7 +81,12 @@ export interface PortDef {
   note?: string;
 }
 
-export type RequirementKind = 'onewire-pullup' | 'i2c-pullup';
+export type RequirementKind =
+  | 'onewire-pullup'
+  | 'i2c-pullup'
+  | 'led-series-resistor'
+  | 'input-pull'
+  | 'signal-voltage-match';
 
 export interface PortOptionDef {
   key: string;
@@ -86,7 +102,7 @@ export interface ComponentDef {
   slug: string;
   displayName: string;
   category: ComponentCategory;
-  /** 画布节点上的短标识（Demo 用字符图标，避免引入图标资源） */
+  /** 画布节点上的短标识 */
   icon: string;
   version: string;
   ports: PortDef[];
@@ -99,11 +115,14 @@ export interface ComponentDef {
 export interface ComponentInstance {
   id: string;
   definitionSlug: string;
+  definitionVersion?: string;
   label: string;
   position: { x: number; y: number };
   /** 端口运行时可选项取值（来自 ComponentDef.portOptions） */
   portConfig: Record<string, string | boolean>;
 }
+
+/* --------------------------------- 连线 --------------------------------- */
 
 export type EndpointRef =
   | { type: 'pin'; pinId: string }
@@ -119,6 +138,8 @@ export interface Connection {
   /** 控制面板可禁用连线：禁用者不参与校验 */
   enabled: boolean;
 }
+
+/* ------------------------------- 校验与诊断 ------------------------------- */
 
 export type Severity = 'error' | 'warning' | 'info';
 
@@ -145,11 +166,13 @@ export interface ValidationResult {
   ruleSetVersion: string;
   diagnostics: Diagnostic[];
   durationMs: number;
-  /** local = 前端内置规则引擎；server = mock 后端权威校验 */
+  /** local = 前端内置规则引擎；server = 后端权威校验 */
   source: 'local' | 'server';
-  /** 离线降级标注（Demo 中用于演示"后端不可用"） */
+  /** 离线降级标注（本地结果时提示规则集可能过期） */
   offline?: boolean;
 }
+
+/* --------------------------------- 项目 --------------------------------- */
 
 export interface ProjectSnapshot {
   boardSlug: string;
@@ -160,4 +183,85 @@ export interface ProjectSnapshot {
     wifiEnabled: boolean;
     mode: 'strict' | 'loose';
   };
+}
+
+/** 项目（服务端形态） */
+export interface Project {
+  id: string;
+  name: string;
+  ownerKey: string;
+  boardSlug: string;
+  boardVersion: string;
+  schemaVersion: number;
+  revision: number;
+  viewport?: { x: number; y: number; zoom: number };
+  createdAt: string;
+  updatedAt: string;
+  expiresAt?: string;
+}
+
+export interface ProjectDetail {
+  project: Project;
+  board: BoardDef;
+  componentDefs: ComponentDef[];
+  instances: ComponentInstance[];
+  connections: Connection[];
+}
+
+/* -------------------------------- API 契约 -------------------------------- */
+
+export interface ApiEnvelope<T> {
+  data: T;
+  meta: { requestId: string; ruleSetVersion?: string };
+}
+
+export interface ApiErrorBody {
+  code: string;
+  message: string;
+  details?: unknown;
+  requestId: string;
+}
+
+export interface CreateProjectRequest {
+  name: string;
+  boardSlug: string;
+  boardVersion?: string;
+}
+
+export interface PatchProjectRequest {
+  name?: string;
+  instances?: ComponentInstance[];
+  connections?: Connection[];
+  viewport?: { x: number; y: number; zoom: number };
+}
+
+export interface RuleConfig {
+  code: string;
+  enabled: boolean;
+  severityOverride?: Severity;
+}
+
+export interface ValidateRequest {
+  snapshot: ProjectSnapshot;
+  ruleSetVersion?: string;
+  ruleConfigs?: RuleConfig[];
+}
+
+/** 规则自身声明的元数据（enabled 由 RuleConfig 在运行时决定） */
+export interface RuleDescriptor {
+  code: string;
+  name: string;
+  severity: Severity;
+  scope: 'connection' | 'component' | 'board' | 'project';
+  tags: string[];
+}
+
+/** 规则在当前规则集中的生效状态（供 /rule-sets/latest 返回） */
+export interface RuleMeta extends RuleDescriptor {
+  enabled: boolean;
+}
+
+export interface RuleSetInfo {
+  version: string;
+  rules: RuleMeta[];
 }

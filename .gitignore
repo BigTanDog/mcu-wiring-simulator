@@ -1,0 +1,19 @@
+# 依赖与构建产物
+node_modules/
+dist/
+build/
+.vite/
+coverage/
+*.tsbuildinfo
+
+# 运行时不入库
+.smoke/
+*.local
+*.log
+.env
+.env.local
+
+# 本地数据库（MVP 使用 SQLite）
+*.db
+*.db-journal
+apps/api/prisma/*.db*

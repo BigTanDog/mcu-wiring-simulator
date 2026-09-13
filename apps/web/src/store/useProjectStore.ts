@@ -9,8 +9,7 @@ import { useMemo } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { mockApi, setSimulatedOffline } from '../api/mockApi';
-import { COMPONENTS, getComponentDef } from '../definitions/components';
-import { getBoard } from '../definitions/esp32';
+import { COMPONENTS, getBoard, getComponentDef } from '@sim/definitions';
 import type {
   ComponentInstance,
   Connection,
@@ -18,8 +17,8 @@ import type {
   EndpointRef,
   ProjectSnapshot,
   ValidationResult,
-} from '../definitions/types';
-import { validateProject } from '../rules/engine';
+} from '@sim/contracts';
+import { validateProject } from '@sim/rule-engine';
 
 /* ---------------------------- Handle 编解码 ---------------------------- */
 
@@ -55,7 +54,9 @@ const roleOfEndpoint = (
   const instance = state.instances.find((item) => item.id === ref.instanceId);
   if (!instance) return 'signal';
   const def = getComponentDef(instance.definitionSlug);
-  return def.ports.find((port) => port.id === ref.portId)?.role ?? 'signal';
+  const role = def.ports.find((port) => port.id === ref.portId)?.role ?? 'signal';
+  // passive（电阻/电容等无源元件）在连线语义上按信号线处理
+  return role === 'passive' ? 'signal' : role;
 };
 
 const protocolOfEndpoint = (

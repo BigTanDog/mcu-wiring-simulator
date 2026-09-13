@@ -2,8 +2,8 @@
  * 顶部栏：项目名、开发板与规则集信息、示例/清空、导入导出、运行按钮（右上角）。
  */
 import { useRef } from 'react';
-import { ESP32_DEVKITC_V4 } from '../definitions/esp32';
-import { RULE_SET_VERSION } from '../rules/engine';
+import { ESP32_DEVKITC_V4 } from '@sim/definitions';
+import { RULE_SET_VERSION } from '@sim/rule-engine';
 import { useProjectStore } from '../store/useProjectStore';
 
 export const TopBar = () => {

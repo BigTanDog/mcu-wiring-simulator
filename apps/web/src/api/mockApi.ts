@@ -5,10 +5,9 @@
  * 接口签名与 docs/产品计划文档.md 第 11.4 章的 REST 草案保持一致，
  * 后续接入真实后端时只需替换本文件的实现（调用方不变）。
  */
-import { BOARDS, getBoard } from '../definitions/esp32';
-import { COMPONENTS } from '../definitions/components';
-import type { BoardDef, ComponentDef, ProjectSnapshot, ValidationResult } from '../definitions/types';
-import { RULE_SET_VERSION, validateProject } from '../rules/engine';
+import { BOARDS, COMPONENTS, getBoard } from '@sim/definitions';
+import type { BoardDef, ComponentDef, ProjectSnapshot, ValidationResult } from '@sim/contracts';
+import { RULE_SET_VERSION, validateProject } from '@sim/rule-engine';
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 

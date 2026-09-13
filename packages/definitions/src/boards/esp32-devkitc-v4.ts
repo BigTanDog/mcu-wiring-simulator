@@ -1,17 +1,18 @@
 /**
  * ESP32-DevKitC V4（ESP32-WROOM-32 模组）引脚定义
  *
- * 数据基线：docs/产品计划文档.md 第 8.2 章。
- * 真实性要点（一致性单测覆盖，见 src/rules/__tests__）：
+ * 数据基线：docs/产品计划文档.md §8.2。
+ * 真实性要点（一致性单测覆盖）：
  *  - GPIO34/35/36/39 仅输入，无输出能力
  *  - GPIO6–11 接内部 SPI Flash，不可用
  *  - ADC1 = {32,33,34,35,36,39}；ADC2 = {0,2,4,12,13,14,15,25,26,27}
  *  - 默认 I2C：SDA=21，SCL=22
  *  - Strapping：0/2/5/12/15
  *
- * 来源：Espressif ESP32-DevKitC V4 用户指南 + ESP32 系列技术参考手册（实现阶段需与官方资料逐项复核）。
+ * 来源：Espressif ESP32-DevKitC V4 用户指南 + ESP32 技术参考手册
+ * （待人工逐项核对：docs/技术设计文档.md G-06 / T-UV4）
  */
-import type { BoardDef, Capability, PinDef } from './types';
+import type { BoardDef, Capability, PinDef } from '@sim/contracts';
 
 const LEFT = 'left' as const;
 const RIGHT = 'right' as const;
@@ -45,7 +46,6 @@ const gpio = (spec: GpioSpec): PinDef => ({
   note: spec.note,
 });
 
-// 左侧排针 J2（自上而下，order 1..19，物理序号 1..19）
 seq = 0;
 const leftPins: PinDef[] = [
   {
@@ -114,7 +114,6 @@ const leftPins: PinDef[] = [
   },
 ];
 
-// 右侧排针 J3（自上而下，order 1..19，物理序号 20..38）
 const rightPins: PinDef[] = [
   {
     id: 'pin-esp32-gnd-2',
@@ -175,12 +174,4 @@ export const ESP32_DEVKITC_V4: BoardDef = {
   logicVoltage: '3V3',
   sourceRef: 'Espressif ESP32-DevKitC V4 用户指南 / ESP32 技术参考手册',
   pins: [...leftPins, ...rightPins],
-};
-
-export const BOARDS: BoardDef[] = [ESP32_DEVKITC_V4];
-
-export const getBoard = (slug: string): BoardDef => {
-  const board = BOARDS.find((item) => item.slug === slug);
-  if (!board) throw new Error(`未找到开发板定义: ${slug}`);
-  return board;
 };

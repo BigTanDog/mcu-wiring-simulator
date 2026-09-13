@@ -5,9 +5,8 @@
  *  - 组件端口配置：选择端口用途 / 是否已接上拉等（驱动组件声明式需求）
  * 出现条件：画布中已有组件且已存在连线（对齐产品文档 6.1 的交互约定）。
  */
-import { getComponentDef } from '../definitions/components';
-import { ESP32_DEVKITC_V4 } from '../definitions/esp32';
-import type { Connection, EndpointRef } from '../definitions/types';
+import { ESP32_DEVKITC_V4, getComponentDef } from '@sim/definitions';
+import type { Connection, EndpointRef } from '@sim/contracts';
 import { useProjectStore } from '../store/useProjectStore';
 
 export const InspectorPanel = () => {

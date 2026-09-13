@@ -5,7 +5,7 @@
  */
 import { useReactFlow } from '@xyflow/react';
 import { useState } from 'react';
-import type { Diagnostic, DiagnosticTarget, Severity } from '../definitions/types';
+import type { Diagnostic, DiagnosticTarget, Severity } from '@sim/contracts';
 import { useActiveResult, useProjectStore } from '../store/useProjectStore';
 
 const SEVERITY_TEXT: Record<Severity, string> = {

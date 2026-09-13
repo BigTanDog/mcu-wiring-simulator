@@ -1,0 +1,32 @@
+{
+  "name": "@sim/definitions",
+  "version": "0.1.0",
+  "private": true,
+  "description": "开发板与组件的声明式定义（新增芯片/组件只改这里的文件）",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./boards/*": {
+      "types": "./dist/boards/*.d.ts",
+      "default": "./dist/boards/*.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@sim/contracts": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}

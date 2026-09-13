@@ -1,13 +1,13 @@
 /**
- * 校验规则引擎（Demo 版）
+ * 规则实现与注册表
  *
- * 设计约束（对齐 docs/产品计划文档.md 第 9 章）：
- *  - 纯函数：输入快照，输出诊断；无副作用、无 IO，可被前后端复用。
- *  - 稳定输出：同一输入重复校验，诊断集合与顺序完全一致（排序键 = severity → code → 首个 target）。
- *  - 规则可独立启停：RULES 注册表 + 每条规则自带元数据。
+ * 约定（docs/技术设计文档.md §6.2）：
+ *  - 每条规则是纯函数：无随机、无时间、无 IO；
+ *  - 必须声明 meta（code/name/severity/scope/tags），由引擎统一编排；
+ *  - 禁止判断组件 slug 写专属分支：组件差异一律走 requirements / portOptions（D-10）。
  *
- * 已实现 14 条：R-01/R-03/R-05/R-06/R-07/R-08/R-10/R-11/R-12/R-13/R-14/R-16/R-17/R-18。
- * 未实现（依赖 Demo 尚未引入的组件类型：LED/舵机/电机/串口模块）：R-02、R-04、R-09、R-15、R-19、R-20。
+ * 当前实现 16 条：R-01/03/05/06/07/08/09/10/11/12/13/14/16/17/18/19。
+ * 未实现（依赖尚未引入的组件类型）：R-02、R-04、R-15、R-20（R-02/R-04 语义已被 R-06/R-07/R-03 覆盖）。
  */
 import type {
   BoardDef,
@@ -18,95 +18,10 @@ import type {
   DiagnosticTarget,
   EndpointRef,
   PinDef,
-  Severity,
-  ValidationResult,
-  ValidationStatus,
-} from '../definitions/types';
-
-/** 规则集版本：规则码集合或语义变更时递增（对齐文档 11.3 的可复现要求） */
-export const RULE_SET_VERSION = 'rules-2026.09.13-demo.1';
-
-/* ------------------------------------------------------------------ */
-/* 快照 → net 归并（并查集）                                            */
-/* ------------------------------------------------------------------ */
-
-interface Net {
-  key: string;
-  pins: PinDef[];
-  ports: Array<{ instance: ComponentInstance; def: ComponentDef; portId: string }>;
-}
-
-const endpointKey = (ref: EndpointRef): string =>
-  ref.type === 'pin' ? `pin:${ref.pinId}` : `port:${ref.instanceId}:${ref.portId}`;
-
-class DisjointSet {
-  private readonly parent = new Map<string, string>();
-
-  find(key: string): string {
-    const parent = this.parent.get(key);
-    if (parent === undefined || parent === key) {
-      this.parent.set(key, key);
-      return key;
-    }
-    const root = this.find(parent);
-    this.parent.set(key, root);
-    return root;
-  }
-
-  union(a: string, b: string): void {
-    const rootA = this.find(a);
-    const rootB = this.find(b);
-    if (rootA !== rootB) this.parent.set(rootB, rootA);
-  }
-}
-
-const buildNets = (
-  board: BoardDef,
-  instances: ComponentInstance[],
-  connections: Connection[],
-  defs: Map<string, ComponentDef>,
-): Net[] => {
-  const pinById = new Map(board.pins.map((pin) => [pin.id, pin]));
-  const instanceById = new Map(instances.map((item) => [item.id, item]));
-  const dsu = new DisjointSet();
-
-  for (const conn of connections) {
-    dsu.union(endpointKey(conn.from), endpointKey(conn.to));
-  }
-
-  const groups = new Map<string, Net>();
-
-  const collect = (ref: EndpointRef): void => {
-    if (ref.type === 'pin') {
-      const pin = pinById.get(ref.pinId);
-      if (!pin) return;
-      const key = dsu.find(endpointKey(ref));
-      const net = groups.get(key) ?? { key, pins: [], ports: [] };
-      if (!net.pins.some((item) => item.id === pin.id)) net.pins.push(pin);
-      groups.set(key, net);
-      return;
-    }
-    const instance = instanceById.get(ref.instanceId);
-    const def = instance ? defs.get(instance.definitionSlug) : undefined;
-    if (!instance || !def) return;
-    if (!def.ports.some((port) => port.id === ref.portId)) return;
-    const key = dsu.find(endpointKey(ref));
-    const net = groups.get(key) ?? { key, pins: [], ports: [] };
-    net.ports.push({ instance, def, portId: ref.portId });
-    groups.set(key, net);
-  };
-
-  for (const conn of connections) {
-    collect(conn.from);
-    collect(conn.to);
-  }
-
-  return [...groups.values()];
-};
-
-/* ------------------------------------------------------------------ */
-/* 规则输入与工具                                                       */
-/* ------------------------------------------------------------------ */
+  RequirementKind,
+  RuleDescriptor,
+} from '@sim/contracts';
+import { hasPassiveComponent, netOfPort, type Net } from './nets';
 
 export interface RuleInput {
   board: BoardDef;
@@ -118,12 +33,14 @@ export interface RuleInput {
   options: { wifiEnabled: boolean };
 }
 
-interface Rule {
-  code: string;
-  name: string;
-  severity: Severity;
+export interface Rule {
+  meta: RuleDescriptor;
   run: (input: RuleInput) => Diagnostic[];
 }
+
+/* ------------------------------------------------------------------ */
+/* 工具                                                                */
+/* ------------------------------------------------------------------ */
 
 const pinTarget = (pinId: string): DiagnosticTarget => ({ type: 'pin', id: pinId });
 
@@ -140,11 +57,13 @@ const hasCapability = (pin: PinDef, capability: PinDef['capabilities'][number]):
 const isPowerPin = (pin: PinDef): boolean => pin.kind === 'power';
 const isGroundPin = (pin: PinDef): boolean => pin.kind === 'ground';
 
-const portNameOf = (def: ComponentDef, portId: string): string =>
-  def.ports.find((port) => port.id === portId)?.name ?? portId;
+const portOf = (def: ComponentDef, portId: string) =>
+  def.ports.find((port) => port.id === portId);
 
-const portRoleOf = (def: ComponentDef, portId: string) =>
-  def.ports.find((port) => port.id === portId)?.role;
+const portNameOf = (def: ComponentDef, portId: string): string =>
+  portOf(def, portId)?.name ?? portId;
+
+const portRoleOf = (def: ComponentDef, portId: string) => portOf(def, portId)?.role;
 
 interface SignalPinPair {
   connection: Connection;
@@ -176,14 +95,47 @@ const signalPinPairs = (input: RuleInput): SignalPinPair[] => {
   return pairs;
 };
 
+const isPortConnected = (
+  connections: Connection[],
+  instanceId: string,
+  portId: string,
+): boolean =>
+  connections.some(
+    (conn) =>
+      (conn.from.type === 'port' &&
+        conn.from.instanceId === instanceId &&
+        conn.from.portId === portId) ||
+      (conn.to.type === 'port' && conn.to.instanceId === instanceId && conn.to.portId === portId),
+  );
+
+/** 该组件是否通过控制面板勾选满足了某项声明式需求 */
+const satisfiedByConfig = (
+  def: ComponentDef,
+  instance: ComponentInstance,
+  requirement: RequirementKind,
+): boolean =>
+  (def.portOptions ?? []).some(
+    (option) => option.satisfies === requirement && instance.portConfig[option.key] === true,
+  );
+
+/** 该组件是否勾选了任何"上拉"类声明（用于判断用户是否试图依赖内部上拉） */
+const usesConfiguredPull = (def: ComponentDef, instance: ComponentInstance): boolean =>
+  (def.portOptions ?? []).some(
+    (option) => option.satisfies && instance.portConfig[option.key] === true,
+  );
+
 /* ------------------------------------------------------------------ */
 /* 规则实现                                                            */
 /* ------------------------------------------------------------------ */
 
 const R01_REQUIRED_PORT: Rule = {
-  code: 'R-01',
-  name: '必要端口未连接',
-  severity: 'error',
+  meta: {
+    code: 'R-01',
+    name: '必要端口未连接',
+    severity: 'error',
+    scope: 'component',
+    tags: ['connectivity'],
+  },
   run: ({ instances, connections, defs }) => {
     const out: Diagnostic[] = [];
     for (const instance of instances) {
@@ -191,16 +143,8 @@ const R01_REQUIRED_PORT: Rule = {
       if (!def) continue;
       for (const port of def.ports) {
         if (!port.required) continue;
-        const connected = connections.some(
-          (conn) =>
-            (conn.from.type === 'port' &&
-              conn.from.instanceId === instance.id &&
-              conn.from.portId === port.id) ||
-            (conn.to.type === 'port' && conn.to.instanceId === instance.id && conn.to.portId === port.id),
-        );
-        if (connected) continue;
-        const hint =
-          port.role === 'power' ? '3V3' : port.role === 'ground' ? 'GND' : '合适的 GPIO';
+        if (isPortConnected(connections, instance.id, port.id)) continue;
+        const hint = port.role === 'power' ? '3V3' : port.role === 'ground' ? 'GND' : '合适的 GPIO';
         out.push({
           code: 'R-01',
           severity: 'error',
@@ -215,9 +159,13 @@ const R01_REQUIRED_PORT: Rule = {
 };
 
 const R03_PIN_MULTIPLE_USE: Rule = {
-  code: 'R-03',
-  name: '引脚重复占用（多驱动）',
-  severity: 'error',
+  meta: {
+    code: 'R-03',
+    name: '引脚重复占用（多驱动）',
+    severity: 'error',
+    scope: 'connection',
+    tags: ['pin-capability'],
+  },
   run: ({ connections, instances, defs, board }) => {
     const out: Diagnostic[] = [];
     const pinById = new Map(board.pins.map((pin) => [pin.id, pin]));
@@ -266,12 +214,17 @@ const R03_PIN_MULTIPLE_USE: Rule = {
 };
 
 const R05_SIGNAL_TO_POWER: Rule = {
-  code: 'R-05',
-  name: '信号线接到电源/地',
-  severity: 'error',
+  meta: {
+    code: 'R-05',
+    name: '信号线接到电源/地',
+    severity: 'error',
+    scope: 'connection',
+    tags: ['power'],
+  },
   run: (input) => {
     const out: Diagnostic[] = [];
     for (const pair of signalPinPairs(input)) {
+      // passive（电阻等无源元件）可接电源/地，不报错
       if (portRoleOf(pair.def, pair.portId) !== 'signal') continue;
       if (!isPowerPin(pair.pin) && !isGroundPin(pair.pin)) continue;
       const portName = portNameOf(pair.def, pair.portId);
@@ -294,9 +247,13 @@ const R05_SIGNAL_TO_POWER: Rule = {
 };
 
 const R06_POWER_SOURCE_MISSING: Rule = {
-  code: 'R-06',
-  name: '电源未接入有效来源',
-  severity: 'error',
+  meta: {
+    code: 'R-06',
+    name: '电源未接入有效来源',
+    severity: 'error',
+    scope: 'component',
+    tags: ['power'],
+  },
   run: ({ nets }) => {
     const out: Diagnostic[] = [];
     for (const net of nets) {
@@ -319,9 +276,13 @@ const R06_POWER_SOURCE_MISSING: Rule = {
 };
 
 const R07_GROUND_MISSING: Rule = {
-  code: 'R-07',
-  name: '未共地',
-  severity: 'error',
+  meta: {
+    code: 'R-07',
+    name: '未共地',
+    severity: 'error',
+    scope: 'component',
+    tags: ['power'],
+  },
   run: ({ nets }) => {
     const out: Diagnostic[] = [];
     for (const net of nets) {
@@ -344,15 +305,20 @@ const R07_GROUND_MISSING: Rule = {
 };
 
 const R08_INPUT_ONLY_MISUSE: Rule = {
-  code: 'R-08',
-  name: '仅输入引脚被用作输出',
-  severity: 'error',
+  meta: {
+    code: 'R-08',
+    name: '仅输入引脚被用作输出',
+    severity: 'error',
+    scope: 'connection',
+    tags: ['pin-capability'],
+  },
   run: (input) => {
     const out: Diagnostic[] = [];
     for (const pair of signalPinPairs(input)) {
       if (!hasCapability(pair.pin, 'INPUT_ONLY')) continue;
-      const port = pair.def.ports.find((candidate) => candidate.id === pair.portId);
-      if (!port || port.direction === 'in') continue;
+      const port = portOf(pair.def, pair.portId);
+      // passive 元件与纯输入端口不驱动引脚，不算"当输出用"
+      if (!port || port.role === 'passive' || port.direction === 'in') continue;
       out.push({
         code: 'R-08',
         severity: 'error',
@@ -369,10 +335,44 @@ const R08_INPUT_ONLY_MISUSE: Rule = {
   },
 };
 
+const R09_INPUT_ONLY_NO_PULL: Rule = {
+  meta: {
+    code: 'R-09',
+    name: '仅输入引脚缺少内部上拉',
+    severity: 'warning',
+    scope: 'connection',
+    tags: ['pin-capability', 'component-requirement'],
+  },
+  run: (input) => {
+    const out: Diagnostic[] = [];
+    for (const pair of signalPinPairs(input)) {
+      if (!hasCapability(pair.pin, 'INPUT_ONLY')) continue;
+      const requiresPull = pair.def.requirements.some(
+        (requirement) => requirement === 'onewire-pullup' || requirement === 'input-pull',
+      );
+      if (!requiresPull) continue;
+      // 仅在用户已声明"使用上拉方案"却落在无内部上拉的引脚上时提示（未声明的情况由 R-12 报）
+      if (!usesConfiguredPull(pair.def, pair.instance)) continue;
+      out.push({
+        code: 'R-09',
+        severity: 'warning',
+        message: `${pair.pin.physicalLabel} 无内部上拉/下拉，${pair.instance.label} 的上拉需外接电阻`,
+        suggestion: '改用带内部上拉的 GPIO（如 GPIO4/5/16–19/21–23/25–27/32/33），或外接 10kΩ 上拉电阻。',
+        targets: [pinTarget(pair.pin.id), portTarget(pair.instance.id, pair.portId)],
+      });
+    }
+    return out;
+  },
+};
+
 const R10_FLASH_RESERVED: Rule = {
-  code: 'R-10',
-  name: 'Flash 保留引脚被占用',
-  severity: 'error',
+  meta: {
+    code: 'R-10',
+    name: 'Flash 保留引脚被占用',
+    severity: 'error',
+    scope: 'connection',
+    tags: ['pin-capability'],
+  },
   run: (input) => {
     const out: Diagnostic[] = [];
     for (const pair of signalPinPairs(input)) {
@@ -390,9 +390,13 @@ const R10_FLASH_RESERVED: Rule = {
 };
 
 const R11_ADC2_WIFI: Rule = {
-  code: 'R-11',
-  name: 'ADC2 引脚与 WiFi 冲突',
-  severity: 'warning',
+  meta: {
+    code: 'R-11',
+    name: 'ADC2 引脚与 WiFi 冲突',
+    severity: 'warning',
+    scope: 'connection',
+    tags: ['pin-capability'],
+  },
   run: (input) => {
     if (!input.options.wifiEnabled) return [];
     const out: Diagnostic[] = [];
@@ -411,38 +415,47 @@ const R11_ADC2_WIFI: Rule = {
 };
 
 const R12_PULLUP_MISSING: Rule = {
-  code: 'R-12',
-  name: '上拉电阻缺失',
-  severity: 'warning',
-  run: ({ instances, connections, defs }) => {
+  meta: {
+    code: 'R-12',
+    name: '上拉电阻缺失',
+    severity: 'warning',
+    scope: 'component',
+    tags: ['component-requirement'],
+  },
+  run: ({ instances, connections, defs, nets }) => {
     const out: Diagnostic[] = [];
     for (const instance of instances) {
       const def = defs.get(instance.definitionSlug);
       if (!def || def.requirements.length === 0) continue;
 
-      const satisfied = (def.portOptions ?? [])
-        .filter((option) => option.satisfies)
-        .some((option) => instance.portConfig[option.key] === true);
-      if (satisfied) continue;
+      const pullRequirements: RequirementKind[] = ['onewire-pullup', 'i2c-pullup', 'input-pull'];
+      const activeRequirement = def.requirements.find((requirement) =>
+        pullRequirements.includes(requirement),
+      );
+      if (!activeRequirement) continue;
+      if (satisfiedByConfig(def, instance, activeRequirement)) continue;
 
-      const relatedPorts = def.ports.filter((port) => (port.protocols ?? []).length > 0);
+      const relatedPorts = def.ports.filter(
+        (port) => port.role === 'signal' || (port.protocols ?? []).length > 0,
+      );
       const connected = relatedPorts.some((port) =>
-        connections.some(
-          (conn) =>
-            (conn.from.type === 'port' &&
-              conn.from.instanceId === instance.id &&
-              conn.from.portId === port.id) ||
-            (conn.to.type === 'port' && conn.to.instanceId === instance.id && conn.to.portId === port.id),
-        ),
+        isPortConnected(connections, instance.id, port.id),
       );
       if (!connected) continue;
 
-      const protocol = def.requirements.includes('i2c-pullup') ? 'I2C' : '单总线';
+      // 线上已挂无源元件（电阻）也算满足——这是教学上最希望看到的结果
+      const byPassive = relatedPorts.some((port) =>
+        hasPassiveComponent(netOfPort(nets, instance.id, port.id), instance.id),
+      );
+      if (byPassive) continue;
+
+      const protocol = activeRequirement === 'i2c-pullup' ? 'I2C' : activeRequirement === 'input-pull' ? '按键' : '单总线';
       out.push({
         code: 'R-12',
         severity: 'warning',
         message: `${instance.label} 的${protocol}信号线上缺少上拉电阻`,
-        suggestion: '在信号线与 3V3 之间接 4.7k–10k 上拉电阻，否则通信可能不稳定（可在左侧控制面板勾选已接上拉）。',
+        suggestion:
+          '在信号线与 3V3 之间接 4.7k–10kΩ 上拉电阻（或勾选控制面板中的"已接上拉"）。',
         targets: [
           { type: 'instance', id: instance.id },
           ...relatedPorts.map((port) => portTarget(instance.id, port.id)),
@@ -454,9 +467,13 @@ const R12_PULLUP_MISSING: Rule = {
 };
 
 const R13_I2C_ADDRESS_CONFLICT: Rule = {
-  code: 'R-13',
-  name: 'I2C 地址冲突',
-  severity: 'error',
+  meta: {
+    code: 'R-13',
+    name: 'I2C 地址冲突',
+    severity: 'error',
+    scope: 'project',
+    tags: ['protocol'],
+  },
   run: ({ instances, connections, defs, board }) => {
     const out: Diagnostic[] = [];
     const pinIds = new Set(board.pins.map((pin) => pin.id));
@@ -523,9 +540,13 @@ const R13_I2C_ADDRESS_CONFLICT: Rule = {
 };
 
 const R14_I2C_NON_DEFAULT_PINS: Rule = {
-  code: 'R-14',
-  name: '使用非默认 I2C 引脚',
-  severity: 'warning',
+  meta: {
+    code: 'R-14',
+    name: '使用非默认 I2C 引脚',
+    severity: 'warning',
+    scope: 'connection',
+    tags: ['protocol'],
+  },
   run: (input) => {
     const out: Diagnostic[] = [];
     const defaultPin: Record<string, string> = {
@@ -538,7 +559,7 @@ const R14_I2C_NON_DEFAULT_PINS: Rule = {
     >();
 
     for (const pair of signalPinPairs(input)) {
-      const port = pair.def.ports.find((candidate) => candidate.id === pair.portId);
+      const port = portOf(pair.def, pair.portId);
       if (!port || !(port.protocols ?? []).includes('I2C')) continue;
       if (pair.pin.id === defaultPin[pair.portId]) continue;
       const entry = perInstance.get(pair.instance.id) ?? { instance: pair.instance, pins: [] };
@@ -555,7 +576,10 @@ const R14_I2C_NON_DEFAULT_PINS: Rule = {
         suggestion: '默认 I2C 为 SDA=GPIO21、SCL=GPIO22；改用其它引脚时需在固件中显式重映射。',
         targets: [
           { type: 'instance', id: entry.instance.id },
-          ...entry.pins.flatMap((item) => [pinTarget(item.pin.id), portTarget(entry.instance.id, item.portId)]),
+          ...entry.pins.flatMap((item) => [
+            pinTarget(item.pin.id),
+            portTarget(entry.instance.id, item.portId),
+          ]),
         ],
       });
     }
@@ -564,9 +588,13 @@ const R14_I2C_NON_DEFAULT_PINS: Rule = {
 };
 
 const R16_STRAP_PIN: Rule = {
-  code: 'R-16',
-  name: '占用启动敏感（Strapping）引脚',
-  severity: 'warning',
+  meta: {
+    code: 'R-16',
+    name: '占用启动敏感（Strapping）引脚',
+    severity: 'warning',
+    scope: 'connection',
+    tags: ['pin-capability'],
+  },
   run: (input) => {
     const out: Diagnostic[] = [];
     for (const pair of signalPinPairs(input)) {
@@ -584,9 +612,13 @@ const R16_STRAP_PIN: Rule = {
 };
 
 const R17_UART0_PIN: Rule = {
-  code: 'R-17',
-  name: '占用 UART0 串口引脚',
-  severity: 'warning',
+  meta: {
+    code: 'R-17',
+    name: '占用 UART0 串口引脚',
+    severity: 'warning',
+    scope: 'connection',
+    tags: ['pin-capability'],
+  },
   run: (input) => {
     const out: Diagnostic[] = [];
     for (const pair of signalPinPairs(input)) {
@@ -604,9 +636,13 @@ const R17_UART0_PIN: Rule = {
 };
 
 const R18_POWER_SHORT: Rule = {
-  code: 'R-18',
-  name: '电源短路',
-  severity: 'error',
+  meta: {
+    code: 'R-18',
+    name: '电源短路',
+    severity: 'error',
+    scope: 'connection',
+    tags: ['power'],
+  },
   run: ({ nets }) => {
     const out: Diagnostic[] = [];
     for (const net of nets) {
@@ -625,6 +661,48 @@ const R18_POWER_SHORT: Rule = {
   },
 };
 
+const R19_LED_SERIES_RESISTOR: Rule = {
+  meta: {
+    code: 'R-19',
+    name: 'LED 缺少限流电阻',
+    severity: 'warning',
+    scope: 'component',
+    tags: ['component-requirement', 'protection'],
+  },
+  run: ({ instances, connections, defs, nets }) => {
+    const out: Diagnostic[] = [];
+    for (const instance of instances) {
+      const def = defs.get(instance.definitionSlug);
+      if (!def || !def.requirements.includes('led-series-resistor')) continue;
+      if (satisfiedByConfig(def, instance, 'led-series-resistor')) continue;
+
+      const signalPorts = def.ports.filter((port) => port.role === 'signal');
+      const connected = signalPorts.some((port) =>
+        isPortConnected(connections, instance.id, port.id),
+      );
+      if (!connected) continue;
+
+      const byPassive = signalPorts.some((port) =>
+        hasPassiveComponent(netOfPort(nets, instance.id, port.id), instance.id),
+      );
+      if (byPassive) continue;
+
+      out.push({
+        code: 'R-19',
+        severity: 'warning',
+        message: `${instance.label} 的信号线上缺少限流电阻`,
+        suggestion:
+          'LED 必须串联 220Ω–1kΩ 限流电阻，否则可能烧毁 LED 或 GPIO（也可在控制面板勾选"已串联限流电阻"）。',
+        targets: [
+          { type: 'instance', id: instance.id },
+          ...signalPorts.map((port) => portTarget(instance.id, port.id)),
+        ],
+      });
+    }
+    return out;
+  },
+};
+
 export const RULES: Rule[] = [
   R01_REQUIRED_PORT,
   R03_PIN_MULTIPLE_USE,
@@ -632,6 +710,7 @@ export const RULES: Rule[] = [
   R06_POWER_SOURCE_MISSING,
   R07_GROUND_MISSING,
   R08_INPUT_ONLY_MISUSE,
+  R09_INPUT_ONLY_NO_PULL,
   R10_FLASH_RESERVED,
   R11_ADC2_WIFI,
   R12_PULLUP_MISSING,
@@ -640,68 +719,5 @@ export const RULES: Rule[] = [
   R16_STRAP_PIN,
   R17_UART0_PIN,
   R18_POWER_SHORT,
+  R19_LED_SERIES_RESISTOR,
 ];
-
-/* ------------------------------------------------------------------ */
-/* 编排                                                                */
-/* ------------------------------------------------------------------ */
-
-const severityWeight: Record<Severity, number> = { error: 0, warning: 1, info: 2 };
-
-const sortDiagnostics = (list: Diagnostic[]): Diagnostic[] =>
-  [...list].sort((a, b) => {
-    const bySeverity = severityWeight[a.severity] - severityWeight[b.severity];
-    if (bySeverity !== 0) return bySeverity;
-    const byCode = a.code.localeCompare(b.code);
-    if (byCode !== 0) return byCode;
-    return (a.targets[0]?.id ?? '').localeCompare(b.targets[0]?.id ?? '');
-  });
-
-export interface ValidateArgs {
-  board: BoardDef;
-  instances: ComponentInstance[];
-  connections: Connection[];
-  /** 组件定义表（由调用方注入，保持引擎与定义来源解耦） */
-  defs: ComponentDef[];
-  options?: { wifiEnabled?: boolean; mode?: 'strict' | 'loose' };
-}
-
-export const validateProject = ({
-  board,
-  instances,
-  connections,
-  defs: defList,
-  options,
-}: ValidateArgs): ValidationResult => {
-  const startedAt = performance.now();
-  const defs = new Map(defList.map((def) => [def.slug, def]));
-  const enabledConnections = connections.filter((conn) => conn.enabled);
-
-  const input: RuleInput = {
-    board,
-    instances,
-    connections: enabledConnections,
-    nets: buildNets(board, instances, enabledConnections, defs),
-    defs,
-    options: { wifiEnabled: options?.wifiEnabled ?? false },
-  };
-
-  const collected: Diagnostic[] = [];
-  for (const rule of RULES) {
-    collected.push(...rule.run(input));
-  }
-
-  const diagnostics = sortDiagnostics(collected);
-  const hasError = diagnostics.some((item) => item.severity === 'error');
-  const hasWarning = diagnostics.some((item) => item.severity === 'warning');
-  const strict = options?.mode === 'strict';
-  const status: ValidationStatus = hasError ? 'failed' : hasWarning && strict ? 'failed' : hasWarning ? 'warning' : 'passed';
-
-  return {
-    status,
-    ruleSetVersion: RULE_SET_VERSION,
-    diagnostics,
-    durationMs: Math.round((performance.now() - startedAt) * 100) / 100,
-    source: 'local',
-  };
-};

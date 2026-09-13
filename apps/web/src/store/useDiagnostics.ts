@@ -3,7 +3,7 @@
  * 供画布节点/连线高亮与结果面板定位使用。
  */
 import { useMemo } from 'react';
-import type { Severity } from '../definitions/types';
+import type { Severity } from '@sim/contracts';
 import { useActiveResult } from './useProjectStore';
 
 export interface DiagnosticIndex {

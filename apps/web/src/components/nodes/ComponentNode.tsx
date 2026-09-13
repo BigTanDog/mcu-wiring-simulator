@@ -3,8 +3,8 @@
  * 端口按角色着色，校验后按诊断严重度高亮；端口标签在悬停/选中时展开。
  */
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { getComponentDef } from '../../definitions/components';
-import type { PortDef } from '../../definitions/types';
+import { getComponentDef } from '@sim/definitions';
+import type { PortDef } from '@sim/contracts';
 import { useDiagnosticIndex } from '../../store/useDiagnostics';
 import { portHandleId, useProjectStore } from '../../store/useProjectStore';
 

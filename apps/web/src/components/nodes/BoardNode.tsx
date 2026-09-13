@@ -4,8 +4,8 @@
  * 校验后按诊断严重度高亮。
  */
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { ESP32_DEVKITC_V4 } from '../../definitions/esp32';
-import type { PinDef } from '../../definitions/types';
+import { ESP32_DEVKITC_V4 } from '@sim/definitions';
+import type { PinDef } from '@sim/contracts';
 import { useDiagnosticIndex } from '../../store/useDiagnostics';
 import { pinHandleId } from '../../store/useProjectStore';
 

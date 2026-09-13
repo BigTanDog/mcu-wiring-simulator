@@ -146,6 +146,16 @@ button {
   color: var(--muted);
 }
 
+.chip-ok {
+  background: #ecfdf5;
+  color: var(--success);
+}
+
+.chip-warn {
+  background: #fffbeb;
+  color: var(--warning);
+}
+
 .topbar-spacer {
   flex: 1;
 }

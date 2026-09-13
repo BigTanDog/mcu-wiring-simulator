@@ -8,7 +8,8 @@
 import { useMemo } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { mockApi, setSimulatedOffline } from '../api/mockApi';
+import { apiClient } from '../api/client';
+import { setSimulatedOffline } from '../api/mockApi';
 import { COMPONENTS, getBoard, getComponentDef } from '@sim/definitions';
 import type {
   ComponentInstance,
@@ -302,7 +303,7 @@ export const useProjectStore = create<ProjectState>()(
         set({ localResult: local, running: true });
 
         try {
-          const server = await mockApi.validate(snapshot);
+          const server = await apiClient.validate(snapshot);
           set({ serverResult: server, running: false });
         } catch {
           set({ running: false });

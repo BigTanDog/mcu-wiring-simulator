@@ -4,10 +4,13 @@
 import { useRef } from 'react';
 import { ESP32_DEVKITC_V4 } from '@sim/definitions';
 import { RULE_SET_VERSION } from '@sim/rule-engine';
+import { apiMode } from '../api/client';
+import { useBackendStatus } from '../hooks/useBackendStatus';
 import { useProjectStore } from '../store/useProjectStore';
 
 export const TopBar = () => {
   const projectName = useProjectStore((state) => state.projectName);
+  const { status: backendStatus, info: backendInfo } = useBackendStatus();
   const running = useProjectStore((state) => state.running);
   const runValidation = useProjectStore((state) => state.runValidation);
   const loadSampleProject = useProjectStore((state) => state.loadSampleProject);
@@ -52,7 +55,29 @@ export const TopBar = () => {
       />
 
       <span className="chip">{ESP32_DEVKITC_V4.displayName}</span>
-      <span className="chip chip-muted">规则集 {RULE_SET_VERSION}</span>
+      <span className="chip chip-muted">
+        规则集 {backendInfo?.ruleSetVersion ?? RULE_SET_VERSION}
+      </span>
+      <span
+        className={`chip ${
+          backendStatus === 'online' ? 'chip-ok' : backendStatus === 'offline' ? 'chip-warn' : ''
+        }`}
+        title={
+          backendStatus === 'online'
+            ? `后端已连接（${apiMode} 模式）：校验结果以后端权威结论为准`
+            : backendStatus === 'offline'
+              ? `后端不可达（${apiMode} 模式）：使用本地规则集，结论可能与最新规则不同`
+              : '正在探测后端连通性'
+        }
+      >
+        {backendStatus === 'online'
+          ? `后端已连接 · ${backendInfo?.componentCount ?? 0} 组件 / ${backendInfo?.ruleCount ?? 0} 规则`
+          : backendStatus === 'offline'
+            ? apiMode === 'mock'
+              ? 'Mock 模式（离线演示）'
+              : '后端离线 · 本地规则集'
+            : '检查后端…'}
+      </span>
 
       <span className="topbar-spacer" />
 

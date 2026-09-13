@@ -244,4 +244,56 @@ describe('项目 CRUD 与乐观锁', () => {
     const res = await api().get(`/api/v1/projects/${otherId}`).set('x-owner-key', ownerKey);
     expect(res.status).toBe(404);
   });
+
+  it('回归：不同项目可使用相同的前端局部 id（库内以项目前缀避免主键冲突）', async () => {
+    const instances = [
+      {
+        id: 'c-led',
+        definitionSlug: 'led',
+        definitionVersion: '1.0.0',
+        label: 'LED-1',
+        position: { x: 0, y: 0 },
+        portConfig: { seriesResistor: true },
+      },
+    ];
+    const connections = [
+      {
+        id: 'e-led-a',
+        from: { type: 'pin', pinId: 'pin-esp32-gpio4' },
+        to: { type: 'port', instanceId: 'c-led', portId: 'A' },
+        kind: 'signal',
+        enabled: true,
+      },
+    ];
+
+    const create = async (name: string): Promise<string> => {
+      const res = await api()
+        .post('/api/v1/projects')
+        .set('x-owner-key', ownerKey)
+        .send({ name, boardSlug: 'esp32-devkitc-v4' });
+      return res.body.data.id as string;
+    };
+
+    const firstId = await create('项目 A');
+    const firstPatch = await api()
+      .patch(`/api/v1/projects/${firstId}`)
+      .set('x-owner-key', ownerKey)
+      .set('If-Match', '1')
+      .send({ instances, connections });
+    expect(firstPatch.status).toBe(200);
+
+    const secondId = await create('项目 B');
+    const secondPatch = await api()
+      .patch(`/api/v1/projects/${secondId}`)
+      .set('x-owner-key', ownerKey)
+      .set('If-Match', '1')
+      .send({ instances, connections });
+    // 修复前：同 id 在库内主键冲突 → 500
+    expect(secondPatch.status).toBe(200);
+
+    // 读取时 id 应还原为前端局部 id（语义稳定）
+    const detail = await api().get(`/api/v1/projects/${secondId}`).set('x-owner-key', ownerKey);
+    expect(detail.body.data.instances[0].id).toBe('c-led');
+    expect(detail.body.data.connections[0].id).toBe('e-led-a');
+  });
 });

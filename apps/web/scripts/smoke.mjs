@@ -36,12 +36,31 @@ try {
     if (response.status() >= 400) errors.push(`HTTP ${response.status()} ${response.url()}`);
   });
 
+  // 0. 前置：后端可用性（W5 起前端默认走真实后端）
+  const backendOk = await fetch('http://127.0.0.1:3000/api/v1/health')
+    .then((response) => response.ok)
+    .catch(() => false);
+  check(
+    '后端服务可访问（http://127.0.0.1:3000）',
+    backendOk,
+    backendOk ? '' : '需先启动后端：npm run dev -w @sim/api',
+  );
+
   // 1. 首屏加载
   await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.board-node', { timeout: 15000 });
   await page.screenshot({ path: `${OUT_DIR}/01-initial.png` });
 
   check('顶部栏标题渲染', (await page.getByText('单片机接线仿真与校验平台').count()) > 0);
+
+  // 顶栏后端连通状态提示（前端接真实后端）
+  await page.waitForTimeout(1500);
+  const chips = await page.locator('.chip').allInnerTexts();
+  check(
+    '顶栏显示后端连接状态',
+    chips.some((text) => /后端已连接|后端离线|Mock 模式/.test(text)),
+    chips.join(' | '),
+  );
   check('组件库出现', (await page.getByText('组件库').count()) > 0);
   check('开发板节点渲染（38 引脚）', (await page.locator('.pin-row').count()) === 38);
 
@@ -87,12 +106,21 @@ try {
   check('点击诊断后引脚高亮', highlighted > 0, `高亮引脚数 ${highlighted}`);
   await page.screenshot({ path: `${OUT_DIR}/05-locate.png` });
 
-  // 6. 离线降级：勾选"模拟后端离线"后运行，结果面板须标注离线
-  await page.getByText('模拟后端离线').click();
-  await page.getByRole('button', { name: /运行/ }).click();
-  await page.getByText(/离线模式/).waitFor({ timeout: 8000 });
-  check('后端离线时降级并标注离线', (await page.locator('#root').innerText()).includes('离线模式'));
-  await page.screenshot({ path: `${OUT_DIR}/06-offline.png` });
+  // 6. 结果来源断言：
+  //    - http 模式（默认，接真实后端）→ 必须标注"后端权威校验"
+  //    - mock 模式 → 用"模拟后端离线"验证离线降级标注
+  const isHttpMode = !chips.some((text) => /Mock 模式/.test(text));
+  if (isHttpMode) {
+    const sourceText = await page.locator('.result-source').innerText();
+    check('校验结论来自后端权威结果', /后端权威校验/.test(sourceText), sourceText);
+    await page.screenshot({ path: `${OUT_DIR}/06-backend-source.png` });
+  } else {
+    await page.getByText('模拟后端离线').click();
+    await page.getByRole('button', { name: /运行/ }).click();
+    await page.getByText(/离线模式/).waitFor({ timeout: 8000 });
+    check('后端离线时降级并标注离线', (await page.locator('#root').innerText()).includes('离线模式'));
+    await page.screenshot({ path: `${OUT_DIR}/06-offline.png` });
+  }
 } catch (error) {
   check('执行过程无异常', false, error instanceof Error ? error.message : String(error));
 } finally {

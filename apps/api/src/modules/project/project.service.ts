@@ -19,6 +19,15 @@ import { badRequest, conflict, notFound } from '../../common/domain-errors';
 const DEFAULT_OPTIONS: ProjectOptionsSnapshot = { wifiEnabled: false, mode: 'loose' };
 
 /**
+ * 实例/连线 id 是前端局部唯一（如 `c-led`），直接作为库内主键会跨项目冲突（实测缺陷）。
+ * 存储时加项目前缀保证全局唯一，读取时剥离前缀还给前端，保持前端 id 语义稳定。
+ */
+const scopedId = (projectId: string, localId: string): string => `${projectId}-${localId}`;
+
+const localIdOf = (projectId: string, scoped: string): string =>
+  scoped.startsWith(`${projectId}-`) ? scoped.slice(projectId.length + 1) : scoped;
+
+/**
  * 项目持久化（§8.3 事务边界）：
  *  - 保存项目 = 1 个事务（revision 递增 + 全量替换实例/连线）
  *  - 乐观锁：If-Match: <revision>，冲突返回 409
@@ -67,7 +76,7 @@ export class ProjectService {
 
   private toInstance(row: ComponentInstanceRecord): ComponentInstance {
     return {
-      id: row.id,
+      id: localIdOf(row.projectId, row.id),
       definitionSlug: row.definitionSlug,
       definitionVersion: row.definitionVersion,
       label: row.label,
@@ -78,7 +87,7 @@ export class ProjectService {
 
   private toConnection(row: ConnectionRecord): Connection {
     return {
-      id: row.id,
+      id: localIdOf(row.projectId, row.id),
       from: JSON.parse(row.fromRef) as Connection['from'],
       to: JSON.parse(row.toRef) as Connection['to'],
       kind: row.kind as Connection['kind'],
@@ -182,7 +191,7 @@ export class ProjectService {
         if (body.instances.length > 0) {
           await tx.componentInstanceRecord.createMany({
             data: body.instances.map((item) => ({
-              id: item.id,
+              id: scopedId(id, item.id),
               projectId: id,
               definitionSlug: item.definitionSlug,
               definitionVersion: item.definitionVersion ?? '1.0.0',
@@ -200,7 +209,7 @@ export class ProjectService {
         if (body.connections.length > 0) {
           await tx.connectionRecord.createMany({
             data: body.connections.map((conn) => ({
-              id: conn.id,
+              id: scopedId(id, conn.id),
               projectId: id,
               fromType: conn.from.type,
               fromRef: JSON.stringify(conn.from),

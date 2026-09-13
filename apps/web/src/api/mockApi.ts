@@ -1,13 +1,12 @@
 /**
- * Mock API 客户端（Demo 阶段替代真实后端）
+ * Mock 数据源（VITE_API_MODE=mock 或后端不可用时的离线降级）
  *
- * 目的：在不启动后端服务的前提下，验证"前端 + 后端契约"的交互流程是否合理。
- * 接口签名与 docs/产品计划文档.md 第 11.4 章的 REST 草案保持一致，
- * 后续接入真实后端时只需替换本文件的实现（调用方不变）。
+ * 与 httpClient 实现同一 ApiClient 契约，接口签名对齐 docs/技术设计文档.md §9。
  */
 import { BOARDS, COMPONENTS, getBoard } from '@sim/definitions';
-import type { BoardDef, ComponentDef, ProjectSnapshot, ValidationResult } from '@sim/contracts';
+import type { ProjectSnapshot, ValidationResult } from '@sim/contracts';
 import { RULE_SET_VERSION, validateProject } from '@sim/rule-engine';
+import type { ApiClient, BackendVersionInfo } from './types';
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -20,21 +19,23 @@ export const setSimulatedOffline = (offline: boolean): void => {
 
 export const isSimulatedOffline = (): boolean => simulatedOffline;
 
-export interface ApiClient {
-  health(): Promise<{ status: 'ok'; version: string }>;
-  listBoards(): Promise<BoardDef[]>;
-  getBoard(slug: string): Promise<BoardDef>;
-  listComponents(): Promise<ComponentDef[]>;
-  /** POST /api/v1/validate（权威校验：与前端同源规则 + 服务端规则集版本） */
-  validate(snapshot: ProjectSnapshot): Promise<ValidationResult>;
-  getRuleSetVersion(): Promise<string>;
-}
-
 export const mockApi: ApiClient = {
   async health() {
     await delay(60);
     if (simulatedOffline) throw new Error('后端不可用（模拟）');
-    return { status: 'ok', version: '0.1.0-mock' };
+    return { status: 'ok', version: '0.1.0-mock', db: 'ok' };
+  },
+
+  async version(): Promise<BackendVersionInfo> {
+    await delay(40);
+    if (simulatedOffline) throw new Error('后端不可用（模拟）');
+    return {
+      apiVersion: 'v1-mock',
+      ruleSetVersion: RULE_SET_VERSION,
+      boardCount: BOARDS.length,
+      componentCount: COMPONENTS.length,
+      ruleCount: 0,
+    };
   },
 
   async listBoards() {
@@ -55,7 +56,7 @@ export const mockApi: ApiClient = {
     return COMPONENTS;
   },
 
-  async validate(snapshot: ProjectSnapshot) {
+  async validate(snapshot: ProjectSnapshot): Promise<ValidationResult> {
     await delay(280);
     if (simulatedOffline) throw new Error('后端不可用（模拟）');
     const result = validateProject({

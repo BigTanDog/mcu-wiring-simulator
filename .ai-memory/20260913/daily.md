@@ -38,3 +38,11 @@ session-id: 20260913-1704
 - 验证：新增回归测试 `src/store/__tests__/activeResult.test.tsx`（同 state 多次渲染返回同一引用等 3 例）；全量 37 passed；`tsc --noEmit` OK；`vite build` 成功；dev server HTTP 200
 - 未完成：真实浏览器点击验证仍需人工在预览页确认（无浏览器自动化 MCP）
 - 提交：`fix(FR-09,FR-10): 修复点击运行后白屏`（见 git log）
+
+## [18:4x] 动作: 打通真实浏览器验证能力（E2E 冒烟）
+
+- 文件：`apps/web/scripts/smoke.mjs`、`apps/web/package.json`（`npm run smoke`）、`index.html`（补 favicon 消除 404）、`tsconfig.json`（types: vite/client）、`store`（dev-only 暴露 window.__SIM_STORE__）
+- 决策：用 `playwright-core` + 系统 Chrome（`channel: 'chrome'`）做真实浏览器验证，避免下载 Chromium；替代方案（Chrome DevTools MCP 需用户配置 MCP server；agent-browser 需下载 ~500MB）记录在长期记忆
+- 验证（真实 Chrome，headless）：10/10 通过、0 控制台错误、0 HTTP 4xx/5xx；覆盖首屏 38 引脚渲染、示例 7 条连线、运行后不白屏且"校验通过"、错误接线 R-08 诊断、点击诊断定位（GPIO34 高亮）、离线降级标注；截图 6 张存 `.smoke/`
+- 验证：`npm test` 37 passed；`tsc --noEmit` OK；`vite build` OK
+- 提交：`a694637 test(FR-09): 新增真实浏览器 E2E 冒烟脚本`

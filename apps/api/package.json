@@ -1,0 +1,45 @@
+{
+  "name": "@sim/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "2D 可视化单片机接线仿真与测试平台 - 后端（NestJS + Prisma）",
+  "scripts": {
+    "dev": "ts-node --transpile-only src/main.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "prisma:generate": "prisma generate",
+    "//dev": "注意：dev 必须用 ts-node —— tsx/esbuild 不支持 emitDecoratorMetadata，会导致 NestJS DI 失效（接口 500）",
+    "prisma:migrate": "prisma migrate dev --name init --skip-seed",
+    "prisma:deploy": "prisma migrate deploy",
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@nestjs/common": "^10.4.15",
+    "@nestjs/config": "^3.3.0",
+    "@nestjs/core": "^10.4.15",
+    "@nestjs/platform-express": "^10.4.15",
+    "@prisma/client": "^5.22.0",
+    "@sim/contracts": "*",
+    "@sim/definitions": "*",
+    "@sim/rule-engine": "*",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "^10.4.22",
+    "@swc/core": "^1.16.2",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.2",
+    "@types/supertest": "^6.0.2",
+    "prisma": "^5.22.0",
+    "supertest": "^7.0.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "unplugin-swc": "^1.6.0",
+    "vitest": "^2.1.8"
+  }
+}

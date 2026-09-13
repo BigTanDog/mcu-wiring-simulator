@@ -122,6 +122,9 @@ export const patchProjectRequestSchema = z
     viewport: z
       .object({ x: z.number(), y: z.number(), zoom: z.number().min(0.1).max(4) })
       .optional(),
+    options: z
+      .object({ wifiEnabled: z.boolean(), mode: z.enum(['strict', 'loose']) })
+      .optional(),
   })
   .strict();
 

@@ -186,6 +186,11 @@ export interface ProjectSnapshot {
 }
 
 /** 项目（服务端形态） */
+export interface ProjectOptionsSnapshot {
+  wifiEnabled: boolean;
+  mode: 'strict' | 'loose';
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -195,6 +200,7 @@ export interface Project {
   schemaVersion: number;
   revision: number;
   viewport?: { x: number; y: number; zoom: number };
+  options?: ProjectOptionsSnapshot;
   createdAt: string;
   updatedAt: string;
   expiresAt?: string;
@@ -233,6 +239,7 @@ export interface PatchProjectRequest {
   instances?: ComponentInstance[];
   connections?: Connection[];
   viewport?: { x: number; y: number; zoom: number };
+  options?: ProjectOptionsSnapshot;
 }
 
 export interface RuleConfig {
@@ -245,6 +252,11 @@ export interface ValidateRequest {
   snapshot: ProjectSnapshot;
   ruleSetVersion?: string;
   ruleConfigs?: RuleConfig[];
+}
+
+export interface ImportProjectRequest {
+  name?: string;
+  payload: ProjectSnapshot;
 }
 
 /** 规则自身声明的元数据（enabled 由 RuleConfig 在运行时决定） */

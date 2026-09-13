@@ -1,0 +1,121 @@
+// 数据模型（docs/技术设计文档.md §4.2）
+//
+// 注意：JSON 类字段统一用 String 存 JSON 文本 —— SQLite provider 不支持 Prisma 的 Json 类型，
+// 保持 String 可让本地（SQLite）与生产（PostgreSQL）共用同一套 schema（§4.4）。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// 开发板定义（slug + version 唯一；pins 为引脚数组的 JSON 文本）
+model BoardDefinition {
+  id           String   @id
+  slug         String
+  version      String
+  displayName  String
+  mcuFamily    String
+  logicVoltage String
+  sourceRef    String
+  pins         String
+  createdAt    DateTime @default(now())
+
+  @@unique([slug, version])
+  @@index([slug])
+}
+
+/// 组件定义（slug + version 唯一）
+model ComponentDefinition {
+  id           String   @id
+  slug         String
+  version      String
+  displayName  String
+  category     String
+  icon         String
+  description  String
+  ports        String
+  protocols    String
+  requirements String
+  portOptions  String?
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@unique([slug, version])
+  @@index([category, enabled])
+}
+
+/// 项目（MVP 无账号：ownerKey 为浏览器匿名标识，用于数据隔离）
+model Project {
+  id            String    @id
+  name          String
+  ownerKey      String
+  boardSlug     String
+  boardVersion  String
+  schemaVersion Int       @default(1)
+  revision      Int       @default(1)
+  viewport      String?
+  /// 校验选项（wifiEnabled / mode）的 JSON 文本
+  options       String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  expiresAt     DateTime?
+
+  instances   ComponentInstanceRecord[]
+  connections ConnectionRecord[]
+  runs        ValidationRun[]
+
+  @@index([ownerKey])
+  @@index([expiresAt])
+}
+
+/// 画布上的组件实例
+model ComponentInstanceRecord {
+  id                String @id
+  projectId         String
+  definitionSlug    String
+  definitionVersion String
+  label             String
+  x                 Float
+  y                 Float
+  portConfig        String
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+/// 连线（fromRef / toRef 为 EndpointRef 的 JSON 文本）
+model ConnectionRecord {
+  id        String  @id
+  projectId String
+  fromType  String
+  fromRef   String
+  toType    String
+  toRef     String
+  kind      String
+  enabled   Boolean @default(true)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+/// 校验记录（MVP 仅存档，不做统计报表）
+model ValidationRun {
+  id              String   @id
+  projectId       String?
+  projectRevision Int?
+  ruleSetVersion  String
+  status          String
+  diagnostics     String
+  durationMs      Int
+  createdAt       DateTime @default(now())
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, createdAt])
+}

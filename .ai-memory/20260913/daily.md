@@ -83,5 +83,5 @@ session-id: 20260913-1704
   - 远程：`https://github.com/BigTanDog/2D----------------.git`（GitHub，**Public**，11 次提交，分支 master）
   - 本地 HEAD = 远程 HEAD = `c59b90c`；`git fetch` 无错 → **Windows 凭据管理器已缓存 GitHub 凭据**，命令行 `git push` 返回 `Everything up-to-date` → **命令行推送通道已打通，后续可由 Agent 直接推送**
   - README 配图在 GitHub 可访问（raw 图片 HTTP 200）
-  - ⚠️ **遗留**：仓库名由中文自动转成 `2D` + 16 个连字符，需在 GitHub Settings → Repository name 改为 `mcu-wiring-simulator`；改名后需同步本地 remote（`git remote set-url origin https://github.com/BigTanDog/mcu-wiring-simulator.git`）
-  - CNB 通道仍不可用（MCP 的 API_TOKEN 是占位符，401）
+  - ✅ **仓库已改名**（用户操作）：`https://github.com/BigTanDog/mcu-wiring-simulator.git` —— 本地 remote 已同步（`git remote set-url`），`git ls-remote` / `git fetch` / `git push` 均在新地址下验证通过
+  - CNB 通道仍不可用（MCP 的 API_TOKEN 是占位符，401）；sourceless 时可用 GitHub 通道

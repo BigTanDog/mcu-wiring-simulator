@@ -15,6 +15,7 @@ import {
   type Project,
   type ProjectDetail,
   type ProjectSnapshot,
+  type ProjectSummary,
 } from '@sim/contracts';
 import { unprocessable } from '../../common/domain-errors';
 import { OwnerKey } from '../../common/owner-key.decorator';
@@ -41,6 +42,11 @@ export class ProjectController {
       throw unprocessable('VALIDATION_FAILED', '导入内容不符合契约', parsed.error.issues);
     }
     return this.service.importProject(ownerKey, parsed.data);
+  }
+
+  @Get()
+  list(@OwnerKey() ownerKey: string): Promise<ProjectSummary[]> {
+    return this.service.list(ownerKey);
   }
 
   @Get(':id')

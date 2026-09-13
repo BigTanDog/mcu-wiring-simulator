@@ -229,6 +229,28 @@ describe('项目 CRUD 与乐观锁', () => {
     expect(imported.connections[0].from.pinId).toBe('pin-esp32-gpio4');
   });
 
+  it('GET /projects 返回本人项目列表（含计数），他人项目不可见', async () => {
+    const created = await api()
+      .post('/api/v1/projects')
+      .set('x-owner-key', ownerKey)
+      .send({ name: '列表用例项目', boardSlug: 'esp32-devkitc-v4' });
+    expect(created.status).toBe(201);
+
+    const res = await api().get('/api/v1/projects').set('x-owner-key', ownerKey);
+    expect(res.status).toBe(200);
+    const item = (
+      res.body.data as Array<{ id: string; componentCount: number; connectionCount: number }>
+    ).find((entry) => entry.id === created.body.data.id);
+    expect(item).toBeTruthy();
+    expect(item?.componentCount).toBe(0);
+    expect(item?.connectionCount).toBe(0);
+
+    const otherRes = await api()
+      .get('/api/v1/projects')
+      .set('x-owner-key', `other-${randomUUID()}`);
+    expect(otherRes.body.data).toHaveLength(0);
+  });
+
   it('未找到项目返回 404 PROJECT_NOT_FOUND', async () => {
     const res = await api().get(`/api/v1/projects/${randomUUID()}`).set('x-owner-key', ownerKey);
     expect(res.status).toBe(404);

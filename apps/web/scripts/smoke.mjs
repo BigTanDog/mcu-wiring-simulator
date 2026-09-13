@@ -121,6 +121,45 @@ try {
     check('后端离线时降级并标注离线', (await page.locator('#root').innerText()).includes('离线模式'));
     await page.screenshot({ path: `${OUT_DIR}/06-offline.png` });
   }
+
+  // 7. 项目管理（M-01）：打开面板 → 新建 → 列表出现 → 删除（顺带清理数据）
+  await page.getByTitle('新建 / 打开 / 保存云端项目').click();
+  await page.waitForSelector('.project-modal', { timeout: 5000 });
+  check('项目管理面板可打开', true);
+
+  const draftName = `冒烟项目-${Date.now()}`;
+  await page.getByPlaceholder(/新项目名称/).fill(draftName);
+  await page.getByRole('button', { name: '新建云端项目' }).click();
+
+  let rowsReady = true;
+  try {
+    await page.waitForSelector('.project-row', { timeout: 10000 });
+  } catch {
+    rowsReady = false;
+  }
+
+  const panelText = await page.locator('.project-modal').innerText();
+  const toastText = await page
+    .locator('.toast')
+    .innerText()
+    .catch(() => '(无 toast)');
+  const rowCount = await page.locator('.project-row').count();
+  check(
+    '新建后项目出现在列表',
+    rowsReady && rowCount > 0 && panelText.includes(draftName),
+    rowsReady ? `共 ${rowCount} 条` : `超时；toast=${toastText}；panel=${panelText.replace(/\n/g, ' | ')}`,
+  );
+  check('当前项目显示已绑定云端', /已绑定云端/.test(panelText), panelText.replace(/\n/g, ' | '));
+  await page.screenshot({ path: `${OUT_DIR}/07-project-panel.png` });
+
+  // 删除刚创建的项目（同时验证删除能力，避免污染云端数据）
+  const targetRow = page.locator('.project-row', { hasText: draftName }).first();
+  await targetRow.getByRole('button', { name: '删除' }).click();
+  await page.waitForTimeout(1200);
+  const afterDelete = await page.locator('.project-row', { hasText: draftName }).count();
+  check('删除项目后从列表消失', afterDelete === 0, `剩余 ${afterDelete} 条`);
+
+  await page.getByRole('button', { name: '关闭' }).click();
 } catch (error) {
   check('执行过程无异常', false, error instanceof Error ? error.message : String(error));
 } finally {

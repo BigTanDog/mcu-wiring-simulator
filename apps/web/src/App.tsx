@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { CanvasArea } from './components/CanvasArea';
 import { InspectorPanel } from './components/InspectorPanel';
 import { LibraryPanel } from './components/LibraryPanel';
+import { ProjectPanel } from './components/ProjectPanel';
 import { TopBar } from './components/TopBar';
 import { useProjectStore } from './store/useProjectStore';
 
@@ -33,6 +34,7 @@ export default function App() {
           </aside>
           <CanvasArea />
         </div>
+        <ProjectPanel />
         {toast ? <div className={`toast toast-${toast.kind}`}>{toast.text}</div> : null}
       </div>
     </ReactFlowProvider>

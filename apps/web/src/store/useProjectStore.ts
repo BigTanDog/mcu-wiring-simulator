@@ -9,6 +9,7 @@ import { useMemo } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { apiClient } from '../api/client';
+import { ApiHttpError } from '../api/httpClient';
 import { setSimulatedOffline } from '../api/mockApi';
 import { COMPONENTS, getBoard, getComponentDef } from '@sim/definitions';
 import type {
@@ -16,7 +17,9 @@ import type {
   Connection,
   ConnectionKind,
   EndpointRef,
+  PatchProjectRequest,
   ProjectSnapshot,
+  ProjectSummary,
   ValidationResult,
 } from '@sim/contracts';
 import { validateProject } from '@sim/rule-engine';
@@ -128,7 +131,23 @@ interface ProjectState {
   /** 明暗主题（persist 保存） */
   theme: 'light' | 'dark';
 
+  /* ------------------------- 项目管理（M-01，服务端） ------------------------- */
+  /** 当前绑定的云端项目 id（null = 尚未保存到云端） */
+  currentProjectId: string | null;
+  /** 云端乐观锁版本号（If-Match） */
+  currentRevision: number;
+  saveState: 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict';
+  projectList: ProjectSummary[];
+  projectListLoading: boolean;
+  projectPanelOpen: boolean;
+
   setTheme: (theme: 'light' | 'dark') => void;
+  setProjectPanelOpen: (open: boolean) => void;
+  refreshProjectList: () => Promise<void>;
+  createProjectOnServer: (name: string) => Promise<void>;
+  openProjectById: (id: string) => Promise<void>;
+  saveProjectToServer: (options?: { force?: boolean }) => Promise<void>;
+  deleteProjectById: (id: string) => Promise<void>;
   addInstance: (slug: string, position: { x: number; y: number }) => void;
   moveInstance: (id: string, position: { x: number; y: number }) => void;
   removeInstance: (id: string) => void;
@@ -182,7 +201,170 @@ export const useProjectStore = create<ProjectState>()(
       toast: null,
       theme: 'light',
 
+      currentProjectId: null,
+      currentRevision: 0,
+      saveState: 'idle',
+      projectList: [],
+      projectListLoading: false,
+      projectPanelOpen: false,
+
       setTheme: (theme) => set({ theme }),
+
+      setProjectPanelOpen: (open) => {
+        set({ projectPanelOpen: open });
+        if (open) void get().refreshProjectList();
+      },
+
+      refreshProjectList: async () => {
+        set({ projectListLoading: true });
+        try {
+          const list = await apiClient.listProjects();
+          set({ projectList: list, projectListLoading: false });
+        } catch {
+          set({ projectListLoading: false });
+          get().showToast('无法获取项目列表：后端不可用', 'warn');
+        }
+      },
+
+      createProjectOnServer: async (name) => {
+        const state = get();
+        try {
+          const project = await apiClient.createProject({ name, boardSlug: state.boardSlug });
+          // 新建后立即把当前画布内容写入云端，避免"建了空项目但画布有内容"
+          const saved = await apiClient.saveProject(project.id, project.revision, {
+            instances: state.instances,
+            connections: state.connections,
+            options: { wifiEnabled: state.options.wifiEnabled, mode: state.options.mode },
+          });
+          // 新建后保持面板打开：便于用户看到新项目出现在列表中并继续操作
+          set({
+            currentProjectId: project.id,
+            currentRevision: saved.revision,
+            projectName: project.name,
+            saveState: 'saved',
+          });
+          get().showToast(`已新建云端项目：${project.name}`);
+          void get().refreshProjectList();
+        } catch (error) {
+          set({ saveState: 'error' });
+          get().showToast(
+            `新建项目失败：${error instanceof Error ? error.message : '未知错误'}`,
+            'warn',
+          );
+        }
+      },
+
+      openProjectById: async (id) => {
+        set({ projectListLoading: true });
+        try {
+          const detail = await apiClient.getProject(id);
+          // 打开项目 = 以服务端为准，不应被标记为"有未保存改动"
+          skipNextDirtyMarkOnce();
+          set({
+            currentProjectId: detail.project.id,
+            currentRevision: detail.project.revision,
+            projectName: detail.project.name,
+            boardSlug: detail.project.boardSlug,
+            instances: detail.instances,
+            connections: detail.connections,
+            options: {
+              ...get().options,
+              wifiEnabled: detail.project.options?.wifiEnabled ?? false,
+              mode: detail.project.options?.mode ?? 'loose',
+            },
+            localResult: null,
+            serverResult: null,
+            hasRun: false,
+            saveState: 'saved',
+            selectedInstanceId: null,
+            selectedConnectionId: null,
+            projectPanelOpen: false,
+            projectListLoading: false,
+          });
+          get().showToast(`已打开项目：${detail.project.name}`);
+        } catch (error) {
+          set({ projectListLoading: false });
+          get().showToast(
+            `打开失败：${error instanceof Error ? error.message : '未知错误'}`,
+            'warn',
+          );
+        }
+      },
+
+      saveProjectToServer: async (options) => {
+        const state = get();
+        if (!state.currentProjectId) {
+          get().showToast('当前画布尚未绑定云端项目：请先「新建云端项目」或「导入」', 'warn');
+          return;
+        }
+        const projectId = state.currentProjectId;
+        const patch: PatchProjectRequest = {
+          name: state.projectName,
+          instances: state.instances,
+          connections: state.connections,
+          options: { wifiEnabled: state.options.wifiEnabled, mode: state.options.mode },
+        };
+
+        set({ saveState: 'saving' });
+        try {
+          const result = await apiClient.saveProject(projectId, state.currentRevision, patch);
+          set({ currentRevision: result.revision, saveState: 'saved' });
+          get().showToast(`已保存到云端（revision ${result.revision}）`);
+          void get().refreshProjectList();
+          return;
+        } catch (error) {
+          const conflict = error instanceof ApiHttpError && error.status === 409;
+
+          if (conflict && options?.force) {
+            // 覆盖保存：拉取最新 revision 后重试一次
+            try {
+              const latest = await apiClient.getProject(projectId);
+              const retry = await apiClient.saveProject(
+                projectId,
+                latest.project.revision,
+                patch,
+              );
+              set({ currentRevision: retry.revision, saveState: 'saved' });
+              get().showToast(`已覆盖云端版本（revision ${retry.revision}）`);
+              void get().refreshProjectList();
+              return;
+            } catch (retryError) {
+              set({ saveState: 'error' });
+              get().showToast(
+                `覆盖保存失败：${retryError instanceof Error ? retryError.message : '未知错误'}`,
+                'warn',
+              );
+              return;
+            }
+          }
+
+          set({ saveState: conflict ? 'conflict' : 'error' });
+          get().showToast(
+            conflict
+              ? '云端项目已在别处更新：可「重新加载」或「覆盖保存」'
+              : `保存失败：${error instanceof Error ? error.message : '未知错误'}`,
+            'warn',
+          );
+        }
+      },
+
+      deleteProjectById: async (id) => {
+        try {
+          await apiClient.deleteProject(id);
+          const isCurrent = get().currentProjectId === id;
+          if (isCurrent) {
+            set({ currentProjectId: null, currentRevision: 0, saveState: 'idle' });
+          }
+          get().showToast('已删除云端项目');
+          void get().refreshProjectList();
+        } catch (error) {
+          get().showToast(
+            `删除失败：${error instanceof Error ? error.message : '未知错误'}`,
+            'warn',
+          );
+        }
+      },
+
 
       addInstance: (slug, position) => {
         const def = getComponentDef(slug);
@@ -470,10 +652,46 @@ export const useProjectStore = create<ProjectState>()(
         connections: state.connections,
         options: { ...state.options, backendOffline: false },
         theme: state.theme,
+        currentProjectId: state.currentProjectId,
+        currentRevision: state.currentRevision,
       }),
     },
   ),
 );
+
+/**
+ * 「以服务端为准」的整屏替换（打开项目）调用一次，避免被误标为未保存。
+ * 一次性标志：只跳过一次 dirty 标记。
+ */
+let skipNextDirtyMark = false;
+
+export const skipNextDirtyMarkOnce = (): void => {
+  skipNextDirtyMark = true;
+};
+
+/**
+ * 画布内容变化 → 标记未保存（dirty）。仅当已绑定云端项目时生效；保存过程中不打断。
+ * 用订阅而不是在每个 action 里写，避免遗漏新的编辑入口。
+ *
+ * 注意：只跟踪 instances / connections ——
+ *  - 项目改名不算内容变更（保存时总会带上最新名称）；
+ *  - 新建/打开项目会整体替换画布，调用方需先 skipNextDirtyMarkOnce()。
+ */
+useProjectStore.subscribe((state, prev) => {
+  if (skipNextDirtyMark) {
+    skipNextDirtyMark = false;
+    return;
+  }
+
+  const contentChanged =
+    state.instances !== prev.instances || state.connections !== prev.connections;
+
+  if (!contentChanged) return;
+  if (!state.currentProjectId) return;
+  if (state.saveState === 'saving' || state.saveState === 'dirty') return;
+
+  useProjectStore.setState({ saveState: 'dirty' });
+});
 
 /**
  * 合并校验结果：优先后端权威结果；只有本地结果时标注 offline。

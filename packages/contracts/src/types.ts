@@ -214,6 +214,18 @@ export interface ProjectDetail {
   connections: Connection[];
 }
 
+/** 项目列表项（M-01：项目管理面板用） */
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  boardSlug: string;
+  revision: number;
+  componentCount: number;
+  connectionCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /* -------------------------------- API 契约 -------------------------------- */
 
 export interface ApiEnvelope<T> {

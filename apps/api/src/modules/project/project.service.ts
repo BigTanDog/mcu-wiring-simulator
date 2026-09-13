@@ -10,6 +10,7 @@ import type {
   ProjectDetail,
   ProjectOptionsSnapshot,
   ProjectSnapshot,
+  ProjectSummary,
 } from '@sim/contracts';
 import type { ComponentInstanceRecord, ConnectionRecord, Project as ProjectRow } from '@prisma/client';
 import { COMPONENTS, findBoard } from '@sim/definitions';
@@ -115,6 +116,27 @@ export class ProjectService {
     if (unknown.length > 0) {
       throw badRequest('DEFINITION_NOT_FOUND', `存在未知组件定义: ${unknown.join(', ')}`);
     }
+  }
+
+  /** 项目列表（M-01）：按 ownerKey 隔离，返回计数摘要，按更新时间倒序 */
+  async list(ownerKey: string): Promise<ProjectSummary[]> {
+    const rows = await this.prisma.project.findMany({
+      where: { ownerKey },
+      orderBy: { updatedAt: 'desc' },
+      take: 50,
+      include: { _count: { select: { instances: true, connections: true } } },
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      boardSlug: row.boardSlug,
+      revision: row.revision,
+      componentCount: row._count.instances,
+      connectionCount: row._count.connections,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    }));
   }
 
   async create(ownerKey: string, body: CreateProjectRequest): Promise<Project> {

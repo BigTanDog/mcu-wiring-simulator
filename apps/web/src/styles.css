@@ -1160,3 +1160,152 @@ button {
     transform: translate(-50%, 0);
   }
 }
+
+/* ------------------------- 项目管理面板（M-01） ------------------------- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 45;
+}
+
+.project-modal {
+  width: min(660px, 92vw);
+  max-height: 84vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-head h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.project-current {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-soft);
+}
+
+.project-current-name {
+  font-weight: 600;
+}
+
+.project-current-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.save-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--chip-bg);
+  color: var(--chip-fg);
+  font-size: 10.5px;
+}
+
+.save-badge.save-dirty {
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+}
+
+.save-badge.save-saved {
+  background: var(--ok-bg);
+  color: var(--ok-fg);
+}
+
+.save-badge.save-error,
+.save-badge.save-conflict {
+  background: var(--err-bg);
+  color: var(--error);
+}
+
+.project-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.btn-danger {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.project-create {
+  display: flex;
+  gap: 8px;
+}
+
+.project-create .search-input {
+  margin-bottom: 0;
+  flex: 1;
+}
+
+.project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.project-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel-soft);
+}
+
+.project-row-active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(47, 111, 237, 0.18);
+}
+
+.project-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.project-row-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-row-meta {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--muted);
+}

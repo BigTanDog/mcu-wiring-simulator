@@ -12,6 +12,7 @@ export const TopBar = () => {
   const projectName = useProjectStore((state) => state.projectName);
   const theme = useProjectStore((state) => state.theme);
   const setTheme = useProjectStore((state) => state.setTheme);
+  const setProjectPanelOpen = useProjectStore((state) => state.setProjectPanelOpen);
   const { status: backendStatus, info: backendInfo } = useBackendStatus();
   const running = useProjectStore((state) => state.running);
   const runValidation = useProjectStore((state) => state.runValidation);
@@ -83,6 +84,14 @@ export const TopBar = () => {
 
       <span className="topbar-spacer" />
 
+      <button
+        type="button"
+        className="btn"
+        onClick={() => setProjectPanelOpen(true)}
+        title="新建 / 打开 / 保存云端项目"
+      >
+        项目…
+      </button>
       <button
         type="button"
         className="btn"

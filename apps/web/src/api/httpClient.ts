@@ -2,9 +2,19 @@
  * 真实后端客户端（VITE_API_MODE=http 时启用）
  *
  * 契约见 docs/技术设计文档.md §9：统一包络 { data, meta }，失败 { error }。
- * 超时：默认 5s，/validate 8s（对应的离线降级由 store 处理）。
+ * 超时：默认 5s，/validate 8s（离线降级由 store 处理）。
  */
-import type { ApiEnvelope, BoardDef, ComponentDef, ProjectSnapshot, ValidationResult } from '@sim/contracts';
+import type {
+  ApiEnvelope,
+  BoardDef,
+  ComponentDef,
+  PatchProjectRequest,
+  Project,
+  ProjectDetail,
+  ProjectSnapshot,
+  ProjectSummary,
+  ValidationResult,
+} from '@sim/contracts';
 import type { ApiClient, BackendVersionInfo } from './types';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:3000/api/v1';
@@ -24,6 +34,18 @@ const ownerKey = (): string => {
 
 interface RequestOptions extends RequestInit {
   timeoutMs?: number;
+}
+
+/** 带 HTTP 状态码的错误（便于区分 409 冲突） */
+export class ApiHttpError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ApiHttpError';
+  }
 }
 
 const request = async <T>(path: string, options: RequestOptions = {}): Promise<T> => {
@@ -47,7 +69,11 @@ const request = async <T>(path: string, options: RequestOptions = {}): Promise<T
     };
 
     if (!response.ok) {
-      throw new Error(body.error?.message ?? `请求失败（HTTP ${response.status}）`);
+      throw new ApiHttpError(
+        response.status,
+        body.error?.code ?? 'HTTP_ERROR',
+        body.error?.message ?? `请求失败（HTTP ${response.status}）`,
+      );
     }
     return body.data;
   } finally {
@@ -68,4 +94,23 @@ export const httpApi: ApiClient = {
       timeoutMs: 8000,
     }),
   getRuleSetVersion: async () => (await request<BackendVersionInfo>('/version')).ruleSetVersion,
+
+  listProjects: () => request<ProjectSummary[]>('/projects'),
+  createProject: (input) =>
+    request<Project>('/projects', { method: 'POST', body: JSON.stringify(input) }),
+  getProject: (id) => request<ProjectDetail>(`/projects/${id}`),
+  saveProject: (id: string, revision: number, patch: PatchProjectRequest) =>
+    request<{ revision: number; updatedAt: string }>(`/projects/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+      headers: { 'If-Match': String(revision) },
+      timeoutMs: 8000,
+    }),
+  deleteProject: (id) => request<{ deleted: true }>(`/projects/${id}`, { method: 'DELETE' }),
+  importProject: (payload: ProjectSnapshot, name?: string) =>
+    request<Project>('/projects/import', {
+      method: 'POST',
+      body: JSON.stringify({ payload, name }),
+      timeoutMs: 8000,
+    }),
 };

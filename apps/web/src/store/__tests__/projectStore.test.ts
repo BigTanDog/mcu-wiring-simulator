@@ -26,6 +26,7 @@ const reset = () => {
     running: false,
     toast: null,
     options: { wifiEnabled: false, mode: 'loose', backendOffline: false },
+    hintDismissed: false,
   });
 };
 

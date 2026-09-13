@@ -88,7 +88,7 @@ export const TopBar = () => {
         type="button"
         className="btn"
         onClick={() => setProjectPanelOpen(true)}
-        title="新建 / 打开 / 保存云端项目"
+        title="新建 / 打开 / 保存服务端项目"
       >
         项目…
       </button>

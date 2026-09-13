@@ -98,6 +98,8 @@ body {
 button {
   font-family: inherit;
   font-size: inherit;
+  /* button 默认不继承文本颜色（浏览器用 buttontext），深色主题下会显示为黑字，必须显式继承 */
+  color: inherit;
   cursor: pointer;
 }
 
@@ -467,6 +469,7 @@ button {
   width: 100%;
   padding: 8px 10px;
   border: none;
+  color: var(--text);
   background: var(--panel-soft);
   text-align: left;
   font-weight: 600;
@@ -631,7 +634,7 @@ button {
 
 .pin-number {
   font-size: 9px;
-  color: #94a3b8;
+  color: var(--muted);
 }
 
 .pin-dot {
@@ -883,6 +886,20 @@ button {
   font-size: 9px;
 }
 
+.react-flow__attribution a {
+  color: var(--muted);
+  opacity: 0.75;
+}
+
+/* 深色主题下运行按钮用更深的主色，保证白字对比度达标（亮蓝底白字只有 2.6:1） */
+[data-theme='dark'] .run-btn {
+  background: #2f6fed;
+}
+
+[data-theme='dark'] .run-btn:hover:not(:disabled) {
+  background: #2563eb;
+}
+
 /* 深色主题下适配 React Flow 内建控件（默认样式为白底） */
 [data-theme='dark'] .react-flow__controls-button {
   background: var(--panel);
@@ -902,18 +919,43 @@ button {
   fill: rgba(16, 21, 29, 0.75);
 }
 
+/* 操作提示：位于画布右上角（运行按钮下方），不再压住底部结果面板 */
 .canvas-hint {
   position: absolute;
-  left: 14px;
-  bottom: 14px;
-  padding: 6px 11px;
-  border-radius: 999px;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(460px, 52%);
+  padding: 7px 8px 7px 12px;
+  border-radius: 10px;
   background: var(--overlay);
   border: 1px solid var(--border);
   color: var(--muted);
-  font-size: 11px;
+  font-size: 11.5px;
+  line-height: 1.5;
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12);
-  pointer-events: none;
+}
+
+.hint-close {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-soft);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.hint-close:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
 }
 
 /* ----------------------------- 结果面板 ----------------------------- */
@@ -1009,8 +1051,8 @@ button {
 .result-source {
   padding: 2px 8px;
   border-radius: 999px;
-  background: #eef2ff;
-  color: var(--primary-dark);
+  background: var(--chip-bg);
+  color: var(--chip-fg);
   font-size: 10.5px;
 }
 

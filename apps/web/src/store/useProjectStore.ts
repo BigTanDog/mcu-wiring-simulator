@@ -130,11 +130,13 @@ interface ProjectState {
   toast: { text: string; kind: 'info' | 'warn' } | null;
   /** 明暗主题（persist 保存） */
   theme: 'light' | 'dark';
+  /** 操作提示是否已被用户手动关闭（persist 保存，关闭后不再出现） */
+  hintDismissed: boolean;
 
   /* ------------------------- 项目管理（M-01，服务端） ------------------------- */
-  /** 当前绑定的云端项目 id（null = 尚未保存到云端） */
+  /** 当前绑定的服务端项目 id（null = 尚未保存到服务端） */
   currentProjectId: string | null;
-  /** 云端乐观锁版本号（If-Match） */
+  /** 服务端乐观锁版本号（If-Match） */
   currentRevision: number;
   saveState: 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict';
   projectList: ProjectSummary[];
@@ -142,6 +144,7 @@ interface ProjectState {
   projectPanelOpen: boolean;
 
   setTheme: (theme: 'light' | 'dark') => void;
+  dismissHint: () => void;
   setProjectPanelOpen: (open: boolean) => void;
   refreshProjectList: () => Promise<void>;
   createProjectOnServer: (name: string) => Promise<void>;
@@ -200,6 +203,7 @@ export const useProjectStore = create<ProjectState>()(
       hasRun: false,
       toast: null,
       theme: 'light',
+      hintDismissed: false,
 
       currentProjectId: null,
       currentRevision: 0,
@@ -209,6 +213,7 @@ export const useProjectStore = create<ProjectState>()(
       projectPanelOpen: false,
 
       setTheme: (theme) => set({ theme }),
+      dismissHint: () => set({ hintDismissed: true }),
 
       setProjectPanelOpen: (open) => {
         set({ projectPanelOpen: open });
@@ -230,7 +235,7 @@ export const useProjectStore = create<ProjectState>()(
         const state = get();
         try {
           const project = await apiClient.createProject({ name, boardSlug: state.boardSlug });
-          // 新建后立即把当前画布内容写入云端，避免"建了空项目但画布有内容"
+          // 新建后立即把当前画布内容写入服务端，避免"建了空项目但画布有内容"
           const saved = await apiClient.saveProject(project.id, project.revision, {
             instances: state.instances,
             connections: state.connections,
@@ -243,7 +248,7 @@ export const useProjectStore = create<ProjectState>()(
             projectName: project.name,
             saveState: 'saved',
           });
-          get().showToast(`已新建云端项目：${project.name}`);
+          get().showToast(`已新建服务端项目：${project.name}`);
           void get().refreshProjectList();
         } catch (error) {
           set({ saveState: 'error' });
@@ -294,7 +299,7 @@ export const useProjectStore = create<ProjectState>()(
       saveProjectToServer: async (options) => {
         const state = get();
         if (!state.currentProjectId) {
-          get().showToast('当前画布尚未绑定云端项目：请先「新建云端项目」或「导入」', 'warn');
+          get().showToast('当前画布尚未绑定服务端项目：请先「新建服务端项目」或「导入」', 'warn');
           return;
         }
         const projectId = state.currentProjectId;
@@ -309,7 +314,7 @@ export const useProjectStore = create<ProjectState>()(
         try {
           const result = await apiClient.saveProject(projectId, state.currentRevision, patch);
           set({ currentRevision: result.revision, saveState: 'saved' });
-          get().showToast(`已保存到云端（revision ${result.revision}）`);
+          get().showToast(`已保存到服务端（revision ${result.revision}）`);
           void get().refreshProjectList();
           return;
         } catch (error) {
@@ -325,7 +330,7 @@ export const useProjectStore = create<ProjectState>()(
                 patch,
               );
               set({ currentRevision: retry.revision, saveState: 'saved' });
-              get().showToast(`已覆盖云端版本（revision ${retry.revision}）`);
+              get().showToast(`已覆盖服务端版本（revision ${retry.revision}）`);
               void get().refreshProjectList();
               return;
             } catch (retryError) {
@@ -341,7 +346,7 @@ export const useProjectStore = create<ProjectState>()(
           set({ saveState: conflict ? 'conflict' : 'error' });
           get().showToast(
             conflict
-              ? '云端项目已在别处更新：可「重新加载」或「覆盖保存」'
+              ? '服务端项目已在别处更新：可「重新加载」或「覆盖保存」'
               : `保存失败：${error instanceof Error ? error.message : '未知错误'}`,
             'warn',
           );
@@ -355,7 +360,7 @@ export const useProjectStore = create<ProjectState>()(
           if (isCurrent) {
             set({ currentProjectId: null, currentRevision: 0, saveState: 'idle' });
           }
-          get().showToast('已删除云端项目');
+          get().showToast('已删除服务端项目');
           void get().refreshProjectList();
         } catch (error) {
           get().showToast(
@@ -652,6 +657,7 @@ export const useProjectStore = create<ProjectState>()(
         connections: state.connections,
         options: { ...state.options, backendOffline: false },
         theme: state.theme,
+        hintDismissed: state.hintDismissed,
         currentProjectId: state.currentProjectId,
         currentRevision: state.currentRevision,
       }),
@@ -670,7 +676,7 @@ export const skipNextDirtyMarkOnce = (): void => {
 };
 
 /**
- * 画布内容变化 → 标记未保存（dirty）。仅当已绑定云端项目时生效；保存过程中不打断。
+ * 画布内容变化 → 标记未保存（dirty）。仅当已绑定服务端项目时生效；保存过程中不打断。
  * 用订阅而不是在每个 action 里写，避免遗漏新的编辑入口。
  *
  * 注意：只跟踪 instances / connections ——

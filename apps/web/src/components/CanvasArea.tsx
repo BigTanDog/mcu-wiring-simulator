@@ -42,6 +42,9 @@ export const CanvasArea = () => {
   const selectInstance = useProjectStore((state) => state.selectInstance);
   const selectConnection = useProjectStore((state) => state.selectConnection);
   const hasRun = useProjectStore((state) => state.hasRun);
+  const instanceCount = useProjectStore((state) => state.instances.length);
+  const hintDismissed = useProjectStore((state) => state.hintDismissed);
+  const dismissHint = useProjectStore((state) => state.dismissHint);
   const theme = useProjectStore((state) => state.theme);
   const index = useDiagnosticIndex();
   const { screenToFlowPosition } = useReactFlow();
@@ -189,10 +192,23 @@ export const CanvasArea = () => {
         />
       </ReactFlow>
       <ValidationPanel />
-      {/* 操作提示仅在校验前显示，避免遮挡结果面板 */}
-      {!hasRun ? (
+      {/*
+        操作提示：仅当「画布为空 + 未运行过 + 用户未手动关闭」时出现。
+        之前只要编辑画布（hasRun 被重置）就反复弹出，改为按"画布是否为空"判断，
+        位置也从左下角（会压住结果面板）移到右上角运行按钮下方。
+      */}
+      {!hintDismissed && !hasRun && instanceCount === 0 ? (
         <div className="canvas-hint">
-          操作提示：从左栏拖入组件 → 从端口拖到开发板引脚连线 → 右上角「运行」校验
+          <span>操作提示：从左栏拖入组件 → 从端口拖到开发板引脚连线 → 右上角「运行」校验</span>
+          <button
+            type="button"
+            className="hint-close"
+            onClick={dismissHint}
+            title="不再显示该提示"
+            aria-label="关闭操作提示"
+          >
+            ×
+          </button>
         </div>
       ) : null}
     </div>

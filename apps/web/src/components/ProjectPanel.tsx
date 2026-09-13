@@ -1,20 +1,20 @@
 /**
  * 项目管理面板（M-01）
  *
- * 能力：新建云端项目 / 列出并打开 / 删除 / 保存当前画布到云端；
+ * 能力：新建服务端项目 / 列出并打开 / 删除 / 保存当前画布到服务端；
  * 冲突处理：后端返回 409（revision 不匹配）时提示"覆盖保存"或重新打开。
- * 说明：本地草稿仍由 localStorage 自动保存，未绑定云端时不影响使用。
+ * 说明：本地草稿仍由 localStorage 自动保存，未绑定服务端时不影响使用。
  */
 import { useState } from 'react';
 import { useProjectStore } from '../store/useProjectStore';
 
 const SAVE_LABEL: Record<string, string> = {
-  idle: '未绑定云端',
+  idle: '未绑定服务端',
   dirty: '有未保存改动',
   saving: '保存中…',
   saved: '已保存',
   error: '保存失败',
-  conflict: '云端已更新',
+  conflict: '服务端已更新',
 };
 
 export const ProjectPanel = () => {
@@ -48,7 +48,7 @@ export const ProjectPanel = () => {
           <div>
             <div className="project-current-name">{projectName}</div>
             <div className="project-current-meta">
-              {currentProjectId ? `已绑定云端 · revision ${currentRevision}` : '尚未绑定云端项目'}
+              {currentProjectId ? `已绑定服务端 · revision ${currentRevision}` : '尚未绑定服务端项目'}
               <span className={`save-badge save-${saveState}`}>{SAVE_LABEL[saveState]}</span>
             </div>
           </div>
@@ -59,14 +59,14 @@ export const ProjectPanel = () => {
               onClick={() => void saveProjectToServer()}
               disabled={!currentProjectId || saveState === 'saving'}
             >
-              保存到云端
+              保存到服务端
             </button>
             {saveState === 'conflict' ? (
               <button
                 type="button"
                 className="btn btn-danger"
                 onClick={() => void saveProjectToServer({ force: true })}
-                title="用本地画布覆盖云端版本（拉取最新 revision 后重试）"
+                title="用本地画布覆盖服务端版本（拉取最新 revision 后重试）"
               >
                 覆盖保存
               </button>
@@ -90,16 +90,16 @@ export const ProjectPanel = () => {
               setNewName('');
             }}
           >
-            新建云端项目
+            新建服务端项目
           </button>
         </section>
 
         <section className="project-list">
-          <div className="panel-block-title">云端项目（{list.length}）</div>
+          <div className="panel-block-title">服务端项目（{list.length}）</div>
           {loading ? <p className="lib-hint">加载中…</p> : null}
           {!loading && list.length === 0 ? (
             <p className="lib-hint">
-              还没有云端项目：可新建一个（会把当前画布内容一并保存），或用「导入 JSON」上传本地草稿。
+              还没有服务端项目：可新建一个（会把当前画布内容一并保存），或用「导入 JSON」上传本地草稿。
             </p>
           ) : null}
           {list.map((item) => (
@@ -125,7 +125,7 @@ export const ProjectPanel = () => {
                 type="button"
                 className="link-btn"
                 onClick={() => void deleteProjectById(item.id)}
-                title="删除云端项目"
+                title="删除服务端项目"
               >
                 删除
               </button>

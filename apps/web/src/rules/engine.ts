@@ -1,0 +1,707 @@
+/**
+ * 校验规则引擎（Demo 版）
+ *
+ * 设计约束（对齐 docs/产品计划文档.md 第 9 章）：
+ *  - 纯函数：输入快照，输出诊断；无副作用、无 IO，可被前后端复用。
+ *  - 稳定输出：同一输入重复校验，诊断集合与顺序完全一致（排序键 = severity → code → 首个 target）。
+ *  - 规则可独立启停：RULES 注册表 + 每条规则自带元数据。
+ *
+ * 已实现 14 条：R-01/R-03/R-05/R-06/R-07/R-08/R-10/R-11/R-12/R-13/R-14/R-16/R-17/R-18。
+ * 未实现（依赖 Demo 尚未引入的组件类型：LED/舵机/电机/串口模块）：R-02、R-04、R-09、R-15、R-19、R-20。
+ */
+import type {
+  BoardDef,
+  ComponentDef,
+  ComponentInstance,
+  Connection,
+  Diagnostic,
+  DiagnosticTarget,
+  EndpointRef,
+  PinDef,
+  Severity,
+  ValidationResult,
+  ValidationStatus,
+} from '../definitions/types';
+
+/** 规则集版本：规则码集合或语义变更时递增（对齐文档 11.3 的可复现要求） */
+export const RULE_SET_VERSION = 'rules-2026.09.13-demo.1';
+
+/* ------------------------------------------------------------------ */
+/* 快照 → net 归并（并查集）                                            */
+/* ------------------------------------------------------------------ */
+
+interface Net {
+  key: string;
+  pins: PinDef[];
+  ports: Array<{ instance: ComponentInstance; def: ComponentDef; portId: string }>;
+}
+
+const endpointKey = (ref: EndpointRef): string =>
+  ref.type === 'pin' ? `pin:${ref.pinId}` : `port:${ref.instanceId}:${ref.portId}`;
+
+class DisjointSet {
+  private readonly parent = new Map<string, string>();
+
+  find(key: string): string {
+    const parent = this.parent.get(key);
+    if (parent === undefined || parent === key) {
+      this.parent.set(key, key);
+      return key;
+    }
+    const root = this.find(parent);
+    this.parent.set(key, root);
+    return root;
+  }
+
+  union(a: string, b: string): void {
+    const rootA = this.find(a);
+    const rootB = this.find(b);
+    if (rootA !== rootB) this.parent.set(rootB, rootA);
+  }
+}
+
+const buildNets = (
+  board: BoardDef,
+  instances: ComponentInstance[],
+  connections: Connection[],
+  defs: Map<string, ComponentDef>,
+): Net[] => {
+  const pinById = new Map(board.pins.map((pin) => [pin.id, pin]));
+  const instanceById = new Map(instances.map((item) => [item.id, item]));
+  const dsu = new DisjointSet();
+
+  for (const conn of connections) {
+    dsu.union(endpointKey(conn.from), endpointKey(conn.to));
+  }
+
+  const groups = new Map<string, Net>();
+
+  const collect = (ref: EndpointRef): void => {
+    if (ref.type === 'pin') {
+      const pin = pinById.get(ref.pinId);
+      if (!pin) return;
+      const key = dsu.find(endpointKey(ref));
+      const net = groups.get(key) ?? { key, pins: [], ports: [] };
+      if (!net.pins.some((item) => item.id === pin.id)) net.pins.push(pin);
+      groups.set(key, net);
+      return;
+    }
+    const instance = instanceById.get(ref.instanceId);
+    const def = instance ? defs.get(instance.definitionSlug) : undefined;
+    if (!instance || !def) return;
+    if (!def.ports.some((port) => port.id === ref.portId)) return;
+    const key = dsu.find(endpointKey(ref));
+    const net = groups.get(key) ?? { key, pins: [], ports: [] };
+    net.ports.push({ instance, def, portId: ref.portId });
+    groups.set(key, net);
+  };
+
+  for (const conn of connections) {
+    collect(conn.from);
+    collect(conn.to);
+  }
+
+  return [...groups.values()];
+};
+
+/* ------------------------------------------------------------------ */
+/* 规则输入与工具                                                       */
+/* ------------------------------------------------------------------ */
+
+export interface RuleInput {
+  board: BoardDef;
+  instances: ComponentInstance[];
+  /** 仅启用中的连线 */
+  connections: Connection[];
+  nets: Net[];
+  defs: Map<string, ComponentDef>;
+  options: { wifiEnabled: boolean };
+}
+
+interface Rule {
+  code: string;
+  name: string;
+  severity: Severity;
+  run: (input: RuleInput) => Diagnostic[];
+}
+
+const pinTarget = (pinId: string): DiagnosticTarget => ({ type: 'pin', id: pinId });
+
+const portTarget = (instanceId: string, portId: string): DiagnosticTarget => ({
+  type: 'port',
+  id: `${instanceId}:${portId}`,
+  instanceId,
+  portId,
+});
+
+const hasCapability = (pin: PinDef, capability: PinDef['capabilities'][number]): boolean =>
+  pin.capabilities.includes(capability);
+
+const isPowerPin = (pin: PinDef): boolean => pin.kind === 'power';
+const isGroundPin = (pin: PinDef): boolean => pin.kind === 'ground';
+
+const portNameOf = (def: ComponentDef, portId: string): string =>
+  def.ports.find((port) => port.id === portId)?.name ?? portId;
+
+const portRoleOf = (def: ComponentDef, portId: string) =>
+  def.ports.find((port) => port.id === portId)?.role;
+
+interface SignalPinPair {
+  connection: Connection;
+  pin: PinDef;
+  instance: ComponentInstance;
+  def: ComponentDef;
+  portId: string;
+}
+
+/** 枚举"组件端口 ↔ 开发板引脚"的直接连接 */
+const signalPinPairs = (input: RuleInput): SignalPinPair[] => {
+  const pinById = new Map(input.board.pins.map((pin) => [pin.id, pin]));
+  const instanceById = new Map(input.instances.map((item) => [item.id, item]));
+  const pairs: SignalPinPair[] = [];
+
+  for (const conn of input.connections) {
+    const pair = (pinRef: EndpointRef, portRef: EndpointRef): void => {
+      if (pinRef.type !== 'pin' || portRef.type !== 'port') return;
+      const pin = pinById.get(pinRef.pinId);
+      const instance = instanceById.get(portRef.instanceId);
+      const def = instance ? input.defs.get(instance.definitionSlug) : undefined;
+      if (!pin || !instance || !def) return;
+      pairs.push({ connection: conn, pin, instance, def, portId: portRef.portId });
+    };
+    pair(conn.from, conn.to);
+    pair(conn.to, conn.from);
+  }
+
+  return pairs;
+};
+
+/* ------------------------------------------------------------------ */
+/* 规则实现                                                            */
+/* ------------------------------------------------------------------ */
+
+const R01_REQUIRED_PORT: Rule = {
+  code: 'R-01',
+  name: '必要端口未连接',
+  severity: 'error',
+  run: ({ instances, connections, defs }) => {
+    const out: Diagnostic[] = [];
+    for (const instance of instances) {
+      const def = defs.get(instance.definitionSlug);
+      if (!def) continue;
+      for (const port of def.ports) {
+        if (!port.required) continue;
+        const connected = connections.some(
+          (conn) =>
+            (conn.from.type === 'port' &&
+              conn.from.instanceId === instance.id &&
+              conn.from.portId === port.id) ||
+            (conn.to.type === 'port' && conn.to.instanceId === instance.id && conn.to.portId === port.id),
+        );
+        if (connected) continue;
+        const hint =
+          port.role === 'power' ? '3V3' : port.role === 'ground' ? 'GND' : '合适的 GPIO';
+        out.push({
+          code: 'R-01',
+          severity: 'error',
+          message: `${instance.label} 的 ${port.name} 端口未连接`,
+          suggestion: `把 ${port.name} 接到开发板的${hint}。`,
+          targets: [{ type: 'instance', id: instance.id }, portTarget(instance.id, port.id)],
+        });
+      }
+    }
+    return out;
+  },
+};
+
+const R03_PIN_MULTIPLE_USE: Rule = {
+  code: 'R-03',
+  name: '引脚重复占用（多驱动）',
+  severity: 'error',
+  run: ({ connections, instances, defs, board }) => {
+    const out: Diagnostic[] = [];
+    const pinById = new Map(board.pins.map((pin) => [pin.id, pin]));
+    const pinUsage = new Map<string, Array<{ instanceId: string; portId: string }>>();
+    const addUsage = (pinId: string, port: { instanceId: string; portId: string }): void => {
+      const pin = pinById.get(pinId);
+      // 电源/地引脚允许多器件共享（电源轨与地网络语义）；只校验 GPIO 类引脚的多驱动
+      if (!pin || pin.kind !== 'io') return;
+      const list = pinUsage.get(pinId) ?? [];
+      if (!list.some((item) => item.instanceId === port.instanceId && item.portId === port.portId)) {
+        list.push(port);
+      }
+      pinUsage.set(pinId, list);
+    };
+
+    for (const conn of connections) {
+      if (conn.from.type === 'pin' && conn.to.type === 'port') {
+        addUsage(conn.from.pinId, { instanceId: conn.to.instanceId, portId: conn.to.portId });
+      } else if (conn.to.type === 'pin' && conn.from.type === 'port') {
+        addUsage(conn.to.pinId, { instanceId: conn.from.instanceId, portId: conn.from.portId });
+      }
+    }
+
+    for (const [pinId, users] of pinUsage) {
+      if (users.length < 2) continue;
+      const names = users.map((user) => {
+        const instance = instances.find((item) => item.id === user.instanceId);
+        const def = instance ? defs.get(instance.definitionSlug) : undefined;
+        const portName = def ? portNameOf(def, user.portId) : user.portId;
+        return `${instance?.label ?? user.instanceId}.${portName}`;
+      });
+      const sameInstance = users.every((user) => user.instanceId === users[0].instanceId);
+      const pinLabel = pinById.get(pinId)?.physicalLabel ?? pinId;
+      out.push({
+        code: 'R-03',
+        severity: 'error',
+        message: sameInstance
+          ? `${pinLabel}：${names.join(' 与 ')} 被短接在同一个引脚上`
+          : `${pinLabel} 被多个器件占用：${names.join(' / ')}`,
+        suggestion: '一个 GPIO 只接一路信号；共享总线（I2C）应是一对多，而不是多个器件硬接同一输出脚。',
+        targets: [pinTarget(pinId), ...users.map((user) => portTarget(user.instanceId, user.portId))],
+      });
+    }
+    return out;
+  },
+};
+
+const R05_SIGNAL_TO_POWER: Rule = {
+  code: 'R-05',
+  name: '信号线接到电源/地',
+  severity: 'error',
+  run: (input) => {
+    const out: Diagnostic[] = [];
+    for (const pair of signalPinPairs(input)) {
+      if (portRoleOf(pair.def, pair.portId) !== 'signal') continue;
+      if (!isPowerPin(pair.pin) && !isGroundPin(pair.pin)) continue;
+      const portName = portNameOf(pair.def, pair.portId);
+      out.push({
+        code: 'R-05',
+        severity: 'error',
+        message: `${pair.instance.label}.${portName} 接到了${isPowerPin(pair.pin) ? '电源' : '地'}引脚 ${pair.pin.physicalLabel}`,
+        suggestion: isPowerPin(pair.pin)
+          ? '信号线不可接电源引脚（5V 还会损坏 3.3V 逻辑），请改接 GPIO。'
+          : '信号线应接 GPIO，而不是 GND。',
+        targets: [
+          pinTarget(pair.pin.id),
+          portTarget(pair.instance.id, pair.portId),
+          { type: 'connection', id: pair.connection.id },
+        ],
+      });
+    }
+    return out;
+  },
+};
+
+const R06_POWER_SOURCE_MISSING: Rule = {
+  code: 'R-06',
+  name: '电源未接入有效来源',
+  severity: 'error',
+  run: ({ nets }) => {
+    const out: Diagnostic[] = [];
+    for (const net of nets) {
+      const powerPorts = net.ports.filter(
+        (item) => portRoleOf(item.def, item.portId) === 'power',
+      );
+      if (powerPorts.length === 0) continue;
+      if (net.pins.some(isPowerPin)) continue;
+      const first = powerPorts[0];
+      out.push({
+        code: 'R-06',
+        severity: 'error',
+        message: `${first.instance.label}.${portNameOf(first.def, first.portId)} 未接到开发板电源引脚`,
+        suggestion: '把 VCC 接到开发板 3V3（模块允许时可用 5V/VIN），并确保共地。',
+        targets: powerPorts.map((item) => portTarget(item.instance.id, item.portId)),
+      });
+    }
+    return out;
+  },
+};
+
+const R07_GROUND_MISSING: Rule = {
+  code: 'R-07',
+  name: '未共地',
+  severity: 'error',
+  run: ({ nets }) => {
+    const out: Diagnostic[] = [];
+    for (const net of nets) {
+      const groundPorts = net.ports.filter(
+        (item) => portRoleOf(item.def, item.portId) === 'ground',
+      );
+      if (groundPorts.length === 0) continue;
+      if (net.pins.some(isGroundPin)) continue;
+      const first = groundPorts[0];
+      out.push({
+        code: 'R-07',
+        severity: 'error',
+        message: `${first.instance.label}.${portNameOf(first.def, first.portId)} 未接入开发板 GND`,
+        suggestion: '所有器件必须与开发板共地，否则信号无法被正确识别。',
+        targets: groundPorts.map((item) => portTarget(item.instance.id, item.portId)),
+      });
+    }
+    return out;
+  },
+};
+
+const R08_INPUT_ONLY_MISUSE: Rule = {
+  code: 'R-08',
+  name: '仅输入引脚被用作输出',
+  severity: 'error',
+  run: (input) => {
+    const out: Diagnostic[] = [];
+    for (const pair of signalPinPairs(input)) {
+      if (!hasCapability(pair.pin, 'INPUT_ONLY')) continue;
+      const port = pair.def.ports.find((candidate) => candidate.id === pair.portId);
+      if (!port || port.direction === 'in') continue;
+      out.push({
+        code: 'R-08',
+        severity: 'error',
+        message: `${pair.pin.physicalLabel} 仅支持输入，无法作为 ${pair.instance.label}.${port.name} 的数据线`,
+        suggestion: '改用可输出的 GPIO：GPIO4/5/16–19/21–23/25–27/32/33。',
+        targets: [
+          pinTarget(pair.pin.id),
+          portTarget(pair.instance.id, pair.portId),
+          { type: 'connection', id: pair.connection.id },
+        ],
+      });
+    }
+    return out;
+  },
+};
+
+const R10_FLASH_RESERVED: Rule = {
+  code: 'R-10',
+  name: 'Flash 保留引脚被占用',
+  severity: 'error',
+  run: (input) => {
+    const out: Diagnostic[] = [];
+    for (const pair of signalPinPairs(input)) {
+      if (!hasCapability(pair.pin, 'FLASH_RESERVED')) continue;
+      out.push({
+        code: 'R-10',
+        severity: 'error',
+        message: `${pair.pin.physicalLabel} 连接模组内部 SPI Flash，不可用于外设`,
+        suggestion: 'GPIO6–GPIO11 属于内部 Flash 总线，请改用其它 GPIO。',
+        targets: [pinTarget(pair.pin.id), { type: 'connection', id: pair.connection.id }],
+      });
+    }
+    return out;
+  },
+};
+
+const R11_ADC2_WIFI: Rule = {
+  code: 'R-11',
+  name: 'ADC2 引脚与 WiFi 冲突',
+  severity: 'warning',
+  run: (input) => {
+    if (!input.options.wifiEnabled) return [];
+    const out: Diagnostic[] = [];
+    for (const pair of signalPinPairs(input)) {
+      if (!hasCapability(pair.pin, 'ADC2')) continue;
+      out.push({
+        code: 'R-11',
+        severity: 'warning',
+        message: `${pair.pin.physicalLabel} 属 ADC2，启用 WiFi 时不可用于模拟采样`,
+        suggestion: '如需模拟输入，请改用 ADC1 引脚（GPIO32/33/34/35/36/39）。',
+        targets: [pinTarget(pair.pin.id), portTarget(pair.instance.id, pair.portId)],
+      });
+    }
+    return out;
+  },
+};
+
+const R12_PULLUP_MISSING: Rule = {
+  code: 'R-12',
+  name: '上拉电阻缺失',
+  severity: 'warning',
+  run: ({ instances, connections, defs }) => {
+    const out: Diagnostic[] = [];
+    for (const instance of instances) {
+      const def = defs.get(instance.definitionSlug);
+      if (!def || def.requirements.length === 0) continue;
+
+      const satisfied = (def.portOptions ?? [])
+        .filter((option) => option.satisfies)
+        .some((option) => instance.portConfig[option.key] === true);
+      if (satisfied) continue;
+
+      const relatedPorts = def.ports.filter((port) => (port.protocols ?? []).length > 0);
+      const connected = relatedPorts.some((port) =>
+        connections.some(
+          (conn) =>
+            (conn.from.type === 'port' &&
+              conn.from.instanceId === instance.id &&
+              conn.from.portId === port.id) ||
+            (conn.to.type === 'port' && conn.to.instanceId === instance.id && conn.to.portId === port.id),
+        ),
+      );
+      if (!connected) continue;
+
+      const protocol = def.requirements.includes('i2c-pullup') ? 'I2C' : '单总线';
+      out.push({
+        code: 'R-12',
+        severity: 'warning',
+        message: `${instance.label} 的${protocol}信号线上缺少上拉电阻`,
+        suggestion: '在信号线与 3V3 之间接 4.7k–10k 上拉电阻，否则通信可能不稳定（可在左侧控制面板勾选已接上拉）。',
+        targets: [
+          { type: 'instance', id: instance.id },
+          ...relatedPorts.map((port) => portTarget(instance.id, port.id)),
+        ],
+      });
+    }
+    return out;
+  },
+};
+
+const R13_I2C_ADDRESS_CONFLICT: Rule = {
+  code: 'R-13',
+  name: 'I2C 地址冲突',
+  severity: 'error',
+  run: ({ instances, connections, defs, board }) => {
+    const out: Diagnostic[] = [];
+    const pinIds = new Set(board.pins.map((pin) => pin.id));
+
+    const pinOfPort = (instanceId: string, portId: string): string | undefined => {
+      for (const conn of connections) {
+        if (
+          conn.from.type === 'port' &&
+          conn.from.instanceId === instanceId &&
+          conn.from.portId === portId &&
+          conn.to.type === 'pin' &&
+          pinIds.has(conn.to.pinId)
+        ) {
+          return conn.to.pinId;
+        }
+        if (
+          conn.to.type === 'port' &&
+          conn.to.instanceId === instanceId &&
+          conn.to.portId === portId &&
+          conn.from.type === 'pin' &&
+          pinIds.has(conn.from.pinId)
+        ) {
+          return conn.from.pinId;
+        }
+      }
+      return undefined;
+    };
+
+    const buses = new Map<string, Array<{ instance: ComponentInstance; address: string }>>();
+    for (const instance of instances) {
+      const def = defs.get(instance.definitionSlug);
+      if (!def || !def.protocols.includes('I2C')) continue;
+      const scl = pinOfPort(instance.id, 'SCL');
+      const sda = pinOfPort(instance.id, 'SDA');
+      if (!scl && !sda) continue;
+      const addressOption = (def.portOptions ?? []).find((option) => option.key === 'address');
+      const address = String(instance.portConfig.address ?? addressOption?.defaultValue ?? '0x3C');
+      const key = `${scl ?? '-'}|${sda ?? '-'}`;
+      const list = buses.get(key) ?? [];
+      list.push({ instance, address });
+      buses.set(key, list);
+    }
+
+    for (const list of buses.values()) {
+      const byAddress = new Map<string, ComponentInstance[]>();
+      for (const item of list) {
+        const group = byAddress.get(item.address) ?? [];
+        group.push(item.instance);
+        byAddress.set(item.address, group);
+      }
+      for (const [address, group] of byAddress) {
+        if (group.length < 2) continue;
+        out.push({
+          code: 'R-13',
+          severity: 'error',
+          message: `同一条 I2C 总线上有 ${group.length} 个器件使用地址 ${address}`,
+          suggestion: '修改其中一个器件的 I2C 地址（OLED 可切 0x3C / 0x3D），或改接另一组引脚。',
+          targets: group.map((item) => ({ type: 'instance', id: item.id })),
+        });
+      }
+    }
+    return out;
+  },
+};
+
+const R14_I2C_NON_DEFAULT_PINS: Rule = {
+  code: 'R-14',
+  name: '使用非默认 I2C 引脚',
+  severity: 'warning',
+  run: (input) => {
+    const out: Diagnostic[] = [];
+    const defaultPin: Record<string, string> = {
+      SCL: 'pin-esp32-gpio22',
+      SDA: 'pin-esp32-gpio21',
+    };
+    const perInstance = new Map<
+      string,
+      { instance: ComponentInstance; pins: Array<{ pin: PinDef; portId: string }> }
+    >();
+
+    for (const pair of signalPinPairs(input)) {
+      const port = pair.def.ports.find((candidate) => candidate.id === pair.portId);
+      if (!port || !(port.protocols ?? []).includes('I2C')) continue;
+      if (pair.pin.id === defaultPin[pair.portId]) continue;
+      const entry = perInstance.get(pair.instance.id) ?? { instance: pair.instance, pins: [] };
+      entry.pins.push({ pin: pair.pin, portId: pair.portId });
+      perInstance.set(pair.instance.id, entry);
+    }
+
+    for (const entry of perInstance.values()) {
+      const detail = entry.pins.map((item) => `${item.portId} → ${item.pin.physicalLabel}`).join('，');
+      out.push({
+        code: 'R-14',
+        severity: 'warning',
+        message: `${entry.instance.label} 使用了非默认 I2C 引脚：${detail}`,
+        suggestion: '默认 I2C 为 SDA=GPIO21、SCL=GPIO22；改用其它引脚时需在固件中显式重映射。',
+        targets: [
+          { type: 'instance', id: entry.instance.id },
+          ...entry.pins.flatMap((item) => [pinTarget(item.pin.id), portTarget(entry.instance.id, item.portId)]),
+        ],
+      });
+    }
+    return out;
+  },
+};
+
+const R16_STRAP_PIN: Rule = {
+  code: 'R-16',
+  name: '占用启动敏感（Strapping）引脚',
+  severity: 'warning',
+  run: (input) => {
+    const out: Diagnostic[] = [];
+    for (const pair of signalPinPairs(input)) {
+      if (!hasCapability(pair.pin, 'STRAP')) continue;
+      out.push({
+        code: 'R-16',
+        severity: 'warning',
+        message: `${pair.pin.physicalLabel} 是启动敏感引脚（Strapping）`,
+        suggestion: '该引脚上电电平会影响启动模式，外接器件可能导致下载失败或启动异常。',
+        targets: [pinTarget(pair.pin.id), portTarget(pair.instance.id, pair.portId)],
+      });
+    }
+    return out;
+  },
+};
+
+const R17_UART0_PIN: Rule = {
+  code: 'R-17',
+  name: '占用 UART0 串口引脚',
+  severity: 'warning',
+  run: (input) => {
+    const out: Diagnostic[] = [];
+    for (const pair of signalPinPairs(input)) {
+      if (!hasCapability(pair.pin, 'UART0')) continue;
+      out.push({
+        code: 'R-17',
+        severity: 'warning',
+        message: `${pair.pin.physicalLabel} 是 UART0（板载 USB 串口）引脚`,
+        suggestion: '占用后会干扰日志输出与固件下载，建议改用其它 GPIO。',
+        targets: [pinTarget(pair.pin.id), portTarget(pair.instance.id, pair.portId)],
+      });
+    }
+    return out;
+  },
+};
+
+const R18_POWER_SHORT: Rule = {
+  code: 'R-18',
+  name: '电源短路',
+  severity: 'error',
+  run: ({ nets }) => {
+    const out: Diagnostic[] = [];
+    for (const net of nets) {
+      const powerPins = net.pins.filter(isPowerPin);
+      const groundPins = net.pins.filter(isGroundPin);
+      if (powerPins.length === 0 || groundPins.length === 0) continue;
+      out.push({
+        code: 'R-18',
+        severity: 'error',
+        message: `${powerPins[0].physicalLabel} 与 ${groundPins[0].physicalLabel} 被直接短接`,
+        suggestion: '电源与地直接相连会短路，请断开这条连线。',
+        targets: [pinTarget(powerPins[0].id), pinTarget(groundPins[0].id)],
+      });
+    }
+    return out;
+  },
+};
+
+export const RULES: Rule[] = [
+  R01_REQUIRED_PORT,
+  R03_PIN_MULTIPLE_USE,
+  R05_SIGNAL_TO_POWER,
+  R06_POWER_SOURCE_MISSING,
+  R07_GROUND_MISSING,
+  R08_INPUT_ONLY_MISUSE,
+  R10_FLASH_RESERVED,
+  R11_ADC2_WIFI,
+  R12_PULLUP_MISSING,
+  R13_I2C_ADDRESS_CONFLICT,
+  R14_I2C_NON_DEFAULT_PINS,
+  R16_STRAP_PIN,
+  R17_UART0_PIN,
+  R18_POWER_SHORT,
+];
+
+/* ------------------------------------------------------------------ */
+/* 编排                                                                */
+/* ------------------------------------------------------------------ */
+
+const severityWeight: Record<Severity, number> = { error: 0, warning: 1, info: 2 };
+
+const sortDiagnostics = (list: Diagnostic[]): Diagnostic[] =>
+  [...list].sort((a, b) => {
+    const bySeverity = severityWeight[a.severity] - severityWeight[b.severity];
+    if (bySeverity !== 0) return bySeverity;
+    const byCode = a.code.localeCompare(b.code);
+    if (byCode !== 0) return byCode;
+    return (a.targets[0]?.id ?? '').localeCompare(b.targets[0]?.id ?? '');
+  });
+
+export interface ValidateArgs {
+  board: BoardDef;
+  instances: ComponentInstance[];
+  connections: Connection[];
+  /** 组件定义表（由调用方注入，保持引擎与定义来源解耦） */
+  defs: ComponentDef[];
+  options?: { wifiEnabled?: boolean; mode?: 'strict' | 'loose' };
+}
+
+export const validateProject = ({
+  board,
+  instances,
+  connections,
+  defs: defList,
+  options,
+}: ValidateArgs): ValidationResult => {
+  const startedAt = performance.now();
+  const defs = new Map(defList.map((def) => [def.slug, def]));
+  const enabledConnections = connections.filter((conn) => conn.enabled);
+
+  const input: RuleInput = {
+    board,
+    instances,
+    connections: enabledConnections,
+    nets: buildNets(board, instances, enabledConnections, defs),
+    defs,
+    options: { wifiEnabled: options?.wifiEnabled ?? false },
+  };
+
+  const collected: Diagnostic[] = [];
+  for (const rule of RULES) {
+    collected.push(...rule.run(input));
+  }
+
+  const diagnostics = sortDiagnostics(collected);
+  const hasError = diagnostics.some((item) => item.severity === 'error');
+  const hasWarning = diagnostics.some((item) => item.severity === 'warning');
+  const strict = options?.mode === 'strict';
+  const status: ValidationStatus = hasError ? 'failed' : hasWarning && strict ? 'failed' : hasWarning ? 'warning' : 'passed';
+
+  return {
+    status,
+    ruleSetVersion: RULE_SET_VERSION,
+    diagnostics,
+    durationMs: Math.round((performance.now() - startedAt) * 100) / 100,
+    source: 'local',
+  };
+};

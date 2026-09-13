@@ -1,0 +1,34 @@
+import { ReactFlowProvider } from '@xyflow/react';
+import { useEffect } from 'react';
+import { CanvasArea } from './components/CanvasArea';
+import { InspectorPanel } from './components/InspectorPanel';
+import { LibraryPanel } from './components/LibraryPanel';
+import { TopBar } from './components/TopBar';
+import { useProjectStore } from './store/useProjectStore';
+
+export default function App() {
+  const toast = useProjectStore((state) => state.toast);
+  const clearToast = useProjectStore((state) => state.clearToast);
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timer = window.setTimeout(clearToast, 3200);
+    return () => window.clearTimeout(timer);
+  }, [toast, clearToast]);
+
+  return (
+    <ReactFlowProvider>
+      <div className="app">
+        <TopBar />
+        <div className="body">
+          <aside className="sidebar">
+            <LibraryPanel />
+            <InspectorPanel />
+          </aside>
+          <CanvasArea />
+        </div>
+        {toast ? <div className={`toast toast-${toast.kind}`}>{toast.text}</div> : null}
+      </div>
+    </ReactFlowProvider>
+  );
+}

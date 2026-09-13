@@ -5,6 +5,7 @@
  *  - 本项目状态：画布内容与配置（Zustand + localStorage 持久化，Demo 代替后端存储）
  *  - 校验状态：本地结果（同步）+ mock 后端结果（异步，模拟权威校验）
  */
+import { useMemo } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { mockApi, setSimulatedOffline } from '../api/mockApi';
@@ -465,9 +466,32 @@ export const useProjectStore = create<ProjectState>()(
   ),
 );
 
-/** 结果面板优先展示后端权威结果；缺失时展示本地结果（并标注离线） */
-export const selectActiveResult = (state: ProjectState): ValidationResult | null => {
-  if (state.serverResult) return state.serverResult;
-  if (state.localResult) return { ...state.localResult, offline: true };
+/**
+ * 合并校验结果：优先后端权威结果；只有本地结果时标注 offline。
+ * 纯函数，供非 React 场景（测试、导出、脚本）使用。
+ */
+export const combineActiveResult = (
+  serverResult: ValidationResult | null,
+  localResult: ValidationResult | null,
+): ValidationResult | null => {
+  if (serverResult) return serverResult;
+  if (localResult) return { ...localResult, offline: true };
   return null;
+};
+
+/**
+ * React 侧读取当前生效的校验结果。
+ *
+ * 必须用 useMemo 缓存引用：zustand v5 直接使用 React 原生 useSyncExternalStore，
+ * 其 getSnapshot 若每次返回新对象，React 会持续判定"快照已变化"并强制重渲染，
+ * 最终抛 "Maximum update depth exceeded" —— 表现为点击「运行」后白屏。
+ * 因此禁止在 selector 内构造新对象，务必在此处缓存。
+ */
+export const useActiveResult = (): ValidationResult | null => {
+  const serverResult = useProjectStore((state) => state.serverResult);
+  const localResult = useProjectStore((state) => state.localResult);
+  return useMemo(
+    () => combineActiveResult(serverResult, localResult),
+    [serverResult, localResult],
+  );
 };

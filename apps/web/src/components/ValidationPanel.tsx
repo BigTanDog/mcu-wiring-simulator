@@ -6,7 +6,7 @@
 import { useReactFlow } from '@xyflow/react';
 import { useState } from 'react';
 import type { Diagnostic, DiagnosticTarget, Severity } from '../definitions/types';
-import { selectActiveResult, useProjectStore } from '../store/useProjectStore';
+import { useActiveResult, useProjectStore } from '../store/useProjectStore';
 
 const SEVERITY_TEXT: Record<Severity, string> = {
   error: '错误',
@@ -21,7 +21,7 @@ const STATUS_TEXT = {
 } as const;
 
 export const ValidationPanel = () => {
-  const result = useProjectStore(selectActiveResult);
+  const result = useActiveResult();
   const running = useProjectStore((state) => state.running);
   const hasRun = useProjectStore((state) => state.hasRun);
   const selectInstance = useProjectStore((state) => state.selectInstance);

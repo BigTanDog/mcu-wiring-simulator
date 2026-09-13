@@ -4,7 +4,7 @@
  */
 import { useMemo } from 'react';
 import type { Severity } from '../definitions/types';
-import { selectActiveResult, useProjectStore } from './useProjectStore';
+import { useActiveResult } from './useProjectStore';
 
 export interface DiagnosticIndex {
   pin: Map<string, Severity>;
@@ -23,7 +23,7 @@ const worse = (current: Severity | undefined, next: Severity): Severity => {
 };
 
 export const useDiagnosticIndex = (): DiagnosticIndex => {
-  const result = useProjectStore(selectActiveResult);
+  const result = useActiveResult();
   return useMemo(() => {
     const pin = new Map<string, Severity>();
     const instance = new Map<string, Severity>();

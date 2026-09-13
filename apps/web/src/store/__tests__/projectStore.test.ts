@@ -5,7 +5,12 @@
  * 覆盖：示例项目端到端校验、离线降级、连线约束、导出导入往返一致性（AC-07）、级联删除。
  */
 import { beforeEach, describe, expect, it } from 'vitest';
-import { selectActiveResult, useProjectStore } from '../useProjectStore';
+import { combineActiveResult, useProjectStore } from '../useProjectStore';
+
+const activeResult = () => {
+  const state = useProjectStore.getState();
+  return combineActiveResult(state.serverResult, state.localResult);
+};
 
 const reset = () => {
   useProjectStore.setState({
@@ -30,7 +35,7 @@ describe('项目流程（store 集成）', () => {
 
     await useProjectStore.getState().runValidation();
 
-    const result = selectActiveResult(useProjectStore.getState());
+    const result = activeResult();
     expect(result?.status).toBe('passed');
     expect(result?.diagnostics).toHaveLength(0);
     expect(result?.source).toBe('server');
@@ -42,7 +47,7 @@ describe('项目流程（store 集成）', () => {
 
     await useProjectStore.getState().runValidation();
 
-    const result = selectActiveResult(useProjectStore.getState());
+    const result = activeResult();
     expect(result?.status).toBe('warning');
     expect(result?.diagnostics.map((item) => item.code)).toContain('R-12');
   });
@@ -53,7 +58,7 @@ describe('项目流程（store 集成）', () => {
 
     await useProjectStore.getState().runValidation();
 
-    const result = selectActiveResult(useProjectStore.getState());
+    const result = activeResult();
     expect(result?.source).toBe('local');
     expect(result?.offline).toBe(true);
     expect(result?.ruleSetVersion).toMatch(/^rules-/);
@@ -136,6 +141,6 @@ describe('项目流程（store 集成）', () => {
   it('画布为空时运行校验：给出提示且不产生结果', async () => {
     await useProjectStore.getState().runValidation();
     expect(useProjectStore.getState().toast?.text).toContain('还没有组件');
-    expect(selectActiveResult(useProjectStore.getState())).toBeNull();
+    expect(activeResult()).toBeNull();
   });
 });

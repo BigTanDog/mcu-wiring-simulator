@@ -73,6 +73,18 @@ session-id: 20260913-1704
 - 未完成（技术文档 §18.4 登记）：M-01 前端项目 CRUD UI 未接后端（接口已就绪）、M-02 组件仅 5/17、M-03 R-15/R-20 未实现、M-04 性能基准未测、M-05 引脚未人工核对、M-06 撤销重做未实现
 - 阻塞：无
 
+## [00:0x] 动作: UI 修复（提示/深色黑字）+ M-02 组件补齐（已完成，待推送）
+
+- 提交：`0c2244c`（UI 修复）、`e7f7173`（M-02）——**仍未推送**（GitHub `Failed to connect`，累计 5 个提交待推：aa20e29 / 5c74f5c / f9da308 / 0c2244c / e7f7173）
+- UI 修复三件事：① 操作提示移到画布右上角（运行按钮下方），显示条件由 `hasRun` 改为「画布为空 + 未运行 + 未手动关闭」，新增 × 按钮（persist）—— 根因是 `hasRun` 在任何编辑后被重置，导致提示反复出现；② 深色黑字根因：**button 默认不继承 color**，`.inst-head` 是 button 故深色下为纯黑 → 全局 `button { color: inherit }` + 显式声明；另修 `.result-source` / `.pin-number` / React Flow attribution / 深色 `.run-btn` 底色；③ 文案「云端」→「服务端」（后端为本机 SQLite，非真云）
+- 新增工具：`apps/web/scripts/check-contrast.mjs` —— 按 WCAG 对比度公式扫描两种主题，输出低对比度元素与祖先路径（当前均 0 项）
+- M-02：契约加 `UART0_TX/RX`、`UART2_TX/RX` 能力（R-20 依据）、`external-power` 需求、`communication` 分类（按 E-06 同步三处）；板定义 GPIO1/3/17/16 标注收发角色
+- M-02 组件（+4，共 9）：HC-SR04（5V ECHO + 独立供电）、SG90（大电流）、有源蜂鸣器、USB-TTL（TX/RX 交叉）
+- M-02 规则（+3，共 19）：R-15 大电流负载需独立供电、R-20 串口未交叉、R-21 5V 直连 3.3V —— 全部走 requirements + portOptions 声明式豁免
+- 验证：rule-engine 39 / api 15 / web 21 = **75 例全绿**；冒烟 17 项 0 控制台错误；seed 幂等（10 条定义，二次新增 0）；双主题可读性 0 项；typecheck 0 error；全量构建成功
+- 文档：技术文档 §6.5 改为「19 已实现 / 2 待实现」、§18 进展与门禁同步；README 规则表 + 组件清单 + 测试数字更新
+- 待办：网络恢复后 `git push origin master`（本地领先 5 个提交）
+
 ## [23:5x] 动作: UI 微调 + M-01 项目管理（已完成，待推送）
 
 - 提交：`aa20e29`（UI 微调）、`5c74f5c`（M-01）——**均未推送**（GitHub 网络 `Connection was reset`，重试 3 次失败）

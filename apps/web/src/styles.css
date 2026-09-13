@@ -1,27 +1,80 @@
-:root {
-  --bg: #f5f7fb;
-  --panel: #ffffff;
-  --panel-soft: #f8fafc;
-  --border: #e2e8f0;
-  --border-strong: #cbd5e1;
-  --text: #1e293b;
-  --muted: #64748b;
+/* 亮色主题（默认）：整体亮度已下调，长时间使用不刺眼 */
+:root,
+[data-theme='light'] {
+  --bg: #e7ecf3;
+  --panel: #f5f7fb;
+  --panel-soft: #eaeff6;
+  --border: #d3dbe6;
+  --border-strong: #b4c0d0;
+  --text: #1a2434;
+  --muted: #586a80;
   --primary: #2f6fed;
   --primary-dark: #1d4ed8;
-  --error: #dc2626;
-  --warning: #d97706;
-  --success: #059669;
+  --error: #d32f2f;
+  --warning: #c2740a;
+  --success: #05795a;
+
+  --chip-bg: #e6ecfb;
+  --chip-fg: #1d4ed8;
+  --ok-bg: #e7f7f0;
+  --ok-fg: #05795a;
+  --warn-bg: #fdf3e3;
+  --warn-fg: #a35f07;
+  --err-bg: #fdeaea;
+  --overlay: rgba(245, 247, 251, 0.97);
+  --canvas-dot: #b9c4d4;
+  --diag-error-bg: #fbf3f3;
+  --diag-warning-bg: #fbf7ee;
 
   --cap-gpio: #2f6fed;
-  --cap-input: #0891b2;
-  --cap-adc: #0e7490;
-  --cap-i2c: #7c3aed;
-  --cap-3v3: #f59e0b;
-  --cap-5v: #dc2626;
-  --cap-gnd: #64748b;
-  --cap-flash: #b6c2d2;
-  --cap-strap: #d97706;
-  --cap-en: #475569;
+  --cap-input: #0e7490;
+  --cap-adc: #0b7285;
+  --cap-i2c: #6d3ae0;
+  --cap-3v3: #d97706;
+  --cap-5v: #c62828;
+  --cap-gnd: #5b6b80;
+  --cap-flash: #a9b6c7;
+  --cap-strap: #c2740a;
+  --cap-en: #45556b;
+}
+
+/* 深色主题（顶栏可切换，persist 保存） */
+[data-theme='dark'] {
+  --bg: #10151d;
+  --panel: #171e28;
+  --panel-soft: #1e2733;
+  --border: #2a3543;
+  --border-strong: #3b4859;
+  --text: #e3e9f2;
+  --muted: #8fa0b6;
+  --primary: #4d8dfb;
+  --primary-dark: #6ba0ff;
+  --error: #f2635f;
+  --warning: #e0a03c;
+  --success: #34c48c;
+
+  --chip-bg: #22304a;
+  --chip-fg: #8fb4ff;
+  --ok-bg: #16342a;
+  --ok-fg: #4bd3a0;
+  --warn-bg: #3a2f18;
+  --warn-fg: #e0a03c;
+  --err-bg: #3a1f1f;
+  --overlay: rgba(23, 30, 40, 0.97);
+  --canvas-dot: #33404f;
+  --diag-error-bg: #241a1c;
+  --diag-warning-bg: #241f18;
+
+  --cap-gpio: #4d8dfb;
+  --cap-input: #35b6cf;
+  --cap-adc: #2fa8c4;
+  --cap-i2c: #a17bf5;
+  --cap-3v3: #e0a03c;
+  --cap-5v: #f2635f;
+  --cap-gnd: #7c8ba1;
+  --cap-flash: #4a5768;
+  --cap-strap: #e0a03c;
+  --cap-en: #94a3b8;
 }
 
 * {
@@ -135,8 +188,8 @@ button {
 .chip {
   padding: 4px 9px;
   border-radius: 999px;
-  background: #eef2ff;
-  color: var(--primary-dark);
+  background: var(--chip-bg);
+  color: var(--chip-fg);
   font-size: 11px;
   white-space: nowrap;
 }
@@ -147,13 +200,13 @@ button {
 }
 
 .chip-ok {
-  background: #ecfdf5;
-  color: var(--success);
+  background: var(--ok-bg);
+  color: var(--ok-fg);
 }
 
 .chip-warn {
-  background: #fffbeb;
-  color: var(--warning);
+  background: var(--warn-bg);
+  color: var(--warn-fg);
 }
 
 .topbar-spacer {
@@ -293,8 +346,8 @@ button {
   height: 30px;
   flex-shrink: 0;
   border-radius: 7px;
-  background: #eef2ff;
-  color: var(--primary-dark);
+  background: var(--chip-bg);
+  color: var(--chip-fg);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.3px;
@@ -425,8 +478,8 @@ button {
   width: 34px;
   height: 22px;
   border-radius: 6px;
-  background: #eef2ff;
-  color: var(--primary-dark);
+  background: var(--chip-bg);
+  color: var(--chip-fg);
   font-size: 9px;
   font-weight: 700;
 }
@@ -488,7 +541,7 @@ button {
 .board-head {
   padding: 10px 12px 8px;
   border-bottom: 1px solid var(--border);
-  background: linear-gradient(180deg, #f8fafc, #ffffff);
+  background: linear-gradient(180deg, var(--panel-soft), var(--panel));
   border-radius: 14px 14px 0 0;
 }
 
@@ -599,8 +652,8 @@ button {
 .pin-handle {
   width: 10px !important;
   height: 10px !important;
-  border: 2px solid #fff;
-  background: #b6c2d2;
+  border: 2px solid var(--panel);
+  background: var(--cap-flash);
   box-shadow: 0 0 0 1px var(--border-strong);
 }
 
@@ -658,7 +711,7 @@ button {
   padding: 9px 11px;
   border-bottom: 1px solid var(--border);
   border-radius: 13px 13px 0 0;
-  background: linear-gradient(180deg, #f8fafc, #ffffff);
+  background: linear-gradient(180deg, var(--panel-soft), var(--panel));
   font-weight: 600;
 }
 
@@ -668,8 +721,8 @@ button {
   width: 38px;
   height: 22px;
   border-radius: 6px;
-  background: #eef2ff;
-  color: var(--primary-dark);
+  background: var(--chip-bg);
+  color: var(--chip-fg);
   font-size: 9px;
   font-weight: 700;
 }
@@ -706,14 +759,14 @@ button {
 .component-badge {
   padding: 2px 7px;
   border-radius: 999px;
-  background: #ecfdf5;
-  color: var(--success);
+  background: var(--ok-bg);
+  color: var(--ok-fg);
   font-size: 9.5px;
 }
 
 .component-badge.badge-warn {
-  background: #fffbeb;
-  color: var(--warning);
+  background: var(--warn-bg);
+  color: var(--warn-fg);
 }
 
 .port-column {
@@ -756,8 +809,8 @@ button {
 .port-handle {
   width: 11px !important;
   height: 11px !important;
-  border: 2px solid #fff;
-  background: #b6c2d2;
+  border: 2px solid var(--panel);
+  background: var(--cap-flash);
   box-shadow: 0 0 0 1px var(--border-strong);
 }
 
@@ -830,17 +883,36 @@ button {
   font-size: 9px;
 }
 
+/* 深色主题下适配 React Flow 内建控件（默认样式为白底） */
+[data-theme='dark'] .react-flow__controls-button {
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  fill: var(--text);
+}
+
+[data-theme='dark'] .react-flow__controls-button:hover {
+  background: var(--panel-soft);
+}
+
+[data-theme='dark'] .react-flow__minimap {
+  background: var(--panel);
+}
+
+[data-theme='dark'] .react-flow__minimap-mask {
+  fill: rgba(16, 21, 29, 0.75);
+}
+
 .canvas-hint {
   position: absolute;
   left: 14px;
   bottom: 14px;
   padding: 6px 11px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--overlay);
   border: 1px solid var(--border);
   color: var(--muted);
   font-size: 11px;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12);
   pointer-events: none;
 }
 
@@ -856,8 +928,8 @@ button {
   flex-direction: column;
   border: 1px solid var(--border-strong);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 -4px 24px rgba(15, 23, 42, 0.12);
+  background: var(--overlay);
+  box-shadow: 0 -4px 24px rgba(15, 23, 42, 0.16);
   overflow: hidden;
 }
 
@@ -898,17 +970,17 @@ button {
 }
 
 .result-passed {
-  background: #ecfdf5;
-  color: var(--success);
+  background: var(--ok-bg);
+  color: var(--ok-fg);
 }
 
 .result-warning {
-  background: #fffbeb;
-  color: var(--warning);
+  background: var(--warn-bg);
+  color: var(--warn-fg);
 }
 
 .result-failed {
-  background: #fef2f2;
+  background: var(--err-bg);
   color: var(--error);
 }
 
@@ -988,12 +1060,12 @@ button {
 
 .diag-error {
   border-left-color: var(--error);
-  background: #fffafa;
+  background: var(--diag-error-bg);
 }
 
 .diag-warning {
   border-left-color: var(--warning);
-  background: #fffdf7;
+  background: var(--diag-warning-bg);
 }
 
 .diag-info {

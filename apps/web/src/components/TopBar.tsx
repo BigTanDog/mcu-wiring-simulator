@@ -10,6 +10,8 @@ import { useProjectStore } from '../store/useProjectStore';
 
 export const TopBar = () => {
   const projectName = useProjectStore((state) => state.projectName);
+  const theme = useProjectStore((state) => state.theme);
+  const setTheme = useProjectStore((state) => state.setTheme);
   const { status: backendStatus, info: backendInfo } = useBackendStatus();
   const running = useProjectStore((state) => state.running);
   const runValidation = useProjectStore((state) => state.runValidation);
@@ -81,6 +83,14 @@ export const TopBar = () => {
 
       <span className="topbar-spacer" />
 
+      <button
+        type="button"
+        className="btn"
+        onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+        title="切换明暗主题"
+      >
+        {theme === 'light' ? '深色' : '浅色'}
+      </button>
       <button type="button" className="btn" onClick={loadSampleProject}>
         载入示例
       </button>

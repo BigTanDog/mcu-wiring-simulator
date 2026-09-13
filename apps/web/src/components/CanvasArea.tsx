@@ -41,6 +41,8 @@ export const CanvasArea = () => {
   const addInstance = useProjectStore((state) => state.addInstance);
   const selectInstance = useProjectStore((state) => state.selectInstance);
   const selectConnection = useProjectStore((state) => state.selectConnection);
+  const hasRun = useProjectStore((state) => state.hasRun);
+  const theme = useProjectStore((state) => state.theme);
   const index = useDiagnosticIndex();
   const { screenToFlowPosition } = useReactFlow();
 
@@ -169,20 +171,30 @@ export const CanvasArea = () => {
         deleteKeyCode={['Delete', 'Backspace']}
         defaultEdgeOptions={{ type: 'bezier' }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#cbd5e1" />
+        <Background
+          variant={BackgroundVariant.Dots}
+          gap={16}
+          size={1}
+          color={theme === 'dark' ? '#33404f' : '#b9c4d4'}
+        />
         <Controls showInteractive={false} />
         <MiniMap
           pannable
           zoomable
           nodeStrokeWidth={2}
-          nodeColor={(node) => (node.type === 'board' ? '#94a3b8' : '#bfdbfe')}
-          maskColor="rgba(241,245,249,.7)"
+          nodeColor={(node) =>
+            node.type === 'board' ? '#94a3b8' : theme === 'dark' ? '#33507a' : '#bfdbfe'
+          }
+          maskColor={theme === 'dark' ? 'rgba(16,21,29,.78)' : 'rgba(231,236,243,.75)'}
         />
       </ReactFlow>
       <ValidationPanel />
-      <div className="canvas-hint">
-        操作提示：从左栏拖入组件 → 从端口拖到开发板引脚连线 → 右上角「运行」校验
-      </div>
+      {/* 操作提示仅在校验前显示，避免遮挡结果面板 */}
+      {!hasRun ? (
+        <div className="canvas-hint">
+          操作提示：从左栏拖入组件 → 从端口拖到开发板引脚连线 → 右上角「运行」校验
+        </div>
+      ) : null}
     </div>
   );
 };

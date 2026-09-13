@@ -9,12 +9,18 @@ import { useProjectStore } from './store/useProjectStore';
 export default function App() {
   const toast = useProjectStore((state) => state.toast);
   const clearToast = useProjectStore((state) => state.clearToast);
+  const theme = useProjectStore((state) => state.theme);
 
   useEffect(() => {
     if (!toast) return undefined;
     const timer = window.setTimeout(clearToast, 3200);
     return () => window.clearTimeout(timer);
   }, [toast, clearToast]);
+
+  // 主题通过 data-theme 挂到根元素，样式表按 [data-theme] 切换变量
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
 
   return (
     <ReactFlowProvider>

@@ -50,6 +50,10 @@
 
 ![控制面板](docs/images/ui-07-control-panel.png)
 
+**明暗主题**（顶栏一键切换，偏好本地持久化；深色下校验结果同样可读）：
+
+![深色主题下的校验通过](docs/images/ui-10-theme-dark-validation.png)
+
 ## 校验规则（16 条）
 
 | 规则码 | 名称 | 严重度 |

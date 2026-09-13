@@ -125,7 +125,10 @@ interface ProjectState {
   running: boolean;
   hasRun: boolean;
   toast: { text: string; kind: 'info' | 'warn' } | null;
+  /** 明暗主题（persist 保存） */
+  theme: 'light' | 'dark';
 
+  setTheme: (theme: 'light' | 'dark') => void;
   addInstance: (slug: string, position: { x: number; y: number }) => void;
   moveInstance: (id: string, position: { x: number; y: number }) => void;
   removeInstance: (id: string) => void;
@@ -177,6 +180,9 @@ export const useProjectStore = create<ProjectState>()(
       running: false,
       hasRun: false,
       toast: null,
+      theme: 'light',
+
+      setTheme: (theme) => set({ theme }),
 
       addInstance: (slug, position) => {
         const def = getComponentDef(slug);
@@ -463,6 +469,7 @@ export const useProjectStore = create<ProjectState>()(
         instances: state.instances,
         connections: state.connections,
         options: { ...state.options, backendOffline: false },
+        theme: state.theme,
       }),
     },
   ),

@@ -132,6 +132,8 @@ interface ProjectState {
   theme: 'light' | 'dark';
   /** 操作提示是否已被用户手动关闭（persist 保存，关闭后不再出现） */
   hintDismissed: boolean;
+  /** 组件库中被折叠的分类（persist 保存，收起后下次打开仍然收起） */
+  collapsedGroups: string[];
 
   /* --------------------------- 撤销 / 重做（FR-15） --------------------------- */
   /** 历史栈（仅画布文档；栈顶为最近一次操作前的快照） */
@@ -152,6 +154,7 @@ interface ProjectState {
 
   setTheme: (theme: 'light' | 'dark') => void;
   dismissHint: () => void;
+  toggleGroup: (key: string) => void;
   setProjectPanelOpen: (open: boolean) => void;
   refreshProjectList: () => Promise<void>;
   createProjectOnServer: (name: string) => Promise<void>;
@@ -252,6 +255,7 @@ export const useProjectStore = create<ProjectState>()(
       toast: null,
       theme: 'light',
       hintDismissed: false,
+      collapsedGroups: [],
       historyPast: [],
       historyFuture: [],
 
@@ -264,6 +268,12 @@ export const useProjectStore = create<ProjectState>()(
 
       setTheme: (theme) => set({ theme }),
       dismissHint: () => set({ hintDismissed: true }),
+      toggleGroup: (key) =>
+        set((state) => ({
+          collapsedGroups: state.collapsedGroups.includes(key)
+            ? state.collapsedGroups.filter((item) => item !== key)
+            : [...state.collapsedGroups, key],
+        })),
 
       setProjectPanelOpen: (open) => {
         set({ projectPanelOpen: open });
@@ -744,6 +754,7 @@ export const useProjectStore = create<ProjectState>()(
         options: { ...state.options, backendOffline: false },
         theme: state.theme,
         hintDismissed: state.hintDismissed,
+        collapsedGroups: state.collapsedGroups,
         currentProjectId: state.currentProjectId,
         currentRevision: state.currentRevision,
       }),
@@ -873,4 +884,4 @@ export const useActiveResult = (): ValidationResult | null => {
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   (window as unknown as { __SIM_STORE__?: typeof useProjectStore }).__SIM_STORE__ =
     useProjectStore;
-}
+} 

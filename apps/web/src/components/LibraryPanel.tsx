@@ -10,7 +10,26 @@ import { useProjectStore } from '../store/useProjectStore';
 export const LibraryPanel = () => {
   const addInstance = useProjectStore((state) => state.addInstance);
   const instances = useProjectStore((state) => state.instances);
+  const collapsedGroups = useProjectStore((state) => state.collapsedGroups);
+  const toggleGroup = useProjectStore((state) => state.toggleGroup);
   const [query, setQuery] = useState('');
+
+  /** 搜索时强制展开所有分类 —— 否则会出现"搜到了组件却看不到" */
+  const isCollapsed = (key: string): boolean => !query.trim() && collapsedGroups.includes(key);
+
+  const groupTitle = (key: string, label: string, count?: number) => (
+    <button
+      type="button"
+      className="lib-group-title"
+      onClick={() => toggleGroup(key)}
+      aria-expanded={!isCollapsed(key)}
+      title={isCollapsed(key) ? '展开该分类' : '收起该分类'}
+    >
+      <span className={`lib-caret${isCollapsed(key) ? ' lib-caret-collapsed' : ''}`}>▾</span>
+      <span>{label}</span>
+      {typeof count === 'number' ? <span className="lib-group-count">{count}</span> : null}
+    </button>
+  );
 
   const grouped = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -48,39 +67,43 @@ export const LibraryPanel = () => {
       />
 
       <div className="lib-group">
-        <div className="lib-group-title">主控芯片</div>
-        <div className="lib-card lib-card-static" title="开发板已默认放置在画布中">
-          <span className="lib-icon">MCU</span>
-          <span className="lib-main">
-            <span className="lib-name">{ESP32_DEVKITC_V4.displayName}</span>
-            <span className="lib-desc">
-              {ESP32_DEVKITC_V4.pins.length} 引脚 · 引脚定义与真实开发板一致
+        {groupTitle('mcu', '主控芯片', 1)}
+        {!isCollapsed('mcu') ? (
+          <div className="lib-card lib-card-static" title="开发板已默认放置在画布中">
+            <span className="lib-icon">MCU</span>
+            <span className="lib-main">
+              <span className="lib-name">{ESP32_DEVKITC_V4.displayName}</span>
+              <span className="lib-desc">
+                {ESP32_DEVKITC_V4.pins.length} 引脚 · 引脚定义与真实开发板一致
+              </span>
             </span>
-          </span>
-          <span className="lib-tag">已放置</span>
-        </div>
+            <span className="lib-tag">已放置</span>
+          </div>
+        ) : null}
       </div>
 
       {grouped.map(([category, items]) => (
         <div className="lib-group" key={category}>
-          <div className="lib-group-title">{CATEGORY_LABELS[category]}</div>
-          {items.map((def) => (
-            <div
-              className="lib-card"
-              key={def.slug}
-              draggable
-              onDragStart={(event) => onDragStart(event, def.slug)}
-              onDoubleClick={() => place(def.slug)}
-              title="拖拽到画布放置（或双击快速放置）"
-            >
-              <span className="lib-icon">{def.icon}</span>
-              <span className="lib-main">
-                <span className="lib-name">{def.displayName}</span>
-                <span className="lib-desc">{def.description}</span>
-              </span>
-              <span className="lib-tag">{def.ports.length} 端口</span>
-            </div>
-          ))}
+          {groupTitle(category, CATEGORY_LABELS[category], items.length)}
+          {!isCollapsed(category)
+            ? items.map((def) => (
+                <div
+                  className="lib-card"
+                  key={def.slug}
+                  draggable
+                  onDragStart={(event) => onDragStart(event, def.slug)}
+                  onDoubleClick={() => place(def.slug)}
+                  title="拖拽到画布放置（或双击快速放置）"
+                >
+                  <span className="lib-icon">{def.icon}</span>
+                  <span className="lib-main">
+                    <span className="lib-name">{def.displayName}</span>
+                    <span className="lib-desc">{def.description}</span>
+                  </span>
+                  <span className="lib-tag">{def.ports.length} 端口</span>
+                </div>
+              ))
+            : null}
         </div>
       ))}
 

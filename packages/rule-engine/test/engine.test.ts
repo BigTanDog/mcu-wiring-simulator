@@ -7,7 +7,7 @@
 import { COMPONENTS, ESP32_DEVKITC_V4 } from '@sim/definitions';
 import type { ComponentInstance, Connection } from '@sim/contracts';
 import { describe, expect, it } from 'vitest';
-import { RULE_SET_VERSION, getRuleSetInfo, validateProject } from '../src/index';
+import { RULE_DOCS, RULES, RULE_SET_VERSION, getRuleSetInfo, validateProject } from '../src/index';
 
 const DEFS = COMPONENTS;
 const BOARD = ESP32_DEVKITC_V4;
@@ -516,5 +516,24 @@ describe('新增经典组件与规则（R-15 独立供电 / R-20 串口交叉 / 
     );
     expect(result.status).toBe('passed');
     expect(result.diagnostics).toHaveLength(0);
+  });
+});
+
+describe('规则教学说明（为什么 / 正确做法）', () => {
+  it('规则集内每条规则都有说明文案，且字段完整', () => {
+    for (const rule of RULES) {
+      const doc = RULE_DOCS[rule.meta.code];
+      expect(doc, `规则 ${rule.meta.code} 缺少说明文案`).toBeTruthy();
+      expect(doc.title).toBe(rule.meta.name);
+      expect(doc.why.length).toBeGreaterThan(10);
+      expect(doc.howTo.length).toBeGreaterThan(5);
+    }
+  });
+
+  it('说明表没有孤儿条目（每个 code 都能对应到规则）', () => {
+    const codes = new Set(RULES.map((rule) => rule.meta.code));
+    for (const code of Object.keys(RULE_DOCS)) {
+      expect(codes.has(code), `说明 ${code} 找不到对应规则`).toBe(true);
+    }
   });
 });

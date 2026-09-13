@@ -213,6 +213,42 @@ try {
     !(await page.getByRole('button', { name: '撤销' }).isDisabled()),
   );
   await page.screenshot({ path: `${OUT_DIR}/09-history.png` });
+
+  // 10. 组件库分类折叠
+  const dhtCardsBefore = await page.locator('.lib-card', { hasText: 'DHT11' }).count();
+  await page.getByRole('button', { name: /传感器/ }).click();
+  await page.waitForTimeout(300);
+  const dhtCardsCollapsed = await page.locator('.lib-card', { hasText: 'DHT11' }).count();
+  check(
+    '组件库分类可折叠',
+    dhtCardsBefore > 0 && dhtCardsCollapsed === 0,
+    `${dhtCardsBefore} → ${dhtCardsCollapsed}`,
+  );
+
+  await page.getByRole('button', { name: /传感器/ }).click();
+  await page.waitForTimeout(300);
+  const dhtCardsExpanded = await page.locator('.lib-card', { hasText: 'DHT11' }).count();
+  check('分类可再次展开', dhtCardsExpanded > 0, `${dhtCardsCollapsed} → ${dhtCardsExpanded}`);
+  await page.screenshot({ path: `${OUT_DIR}/10-library-collapse.png` });
+
+  // 11. 规则「为什么」悬停说明
+  await page.getByRole('button', { name: /载入示例/ }).click();
+  await page.waitForTimeout(500);
+  await page.getByRole('checkbox', { name: /上拉/ }).first().uncheck();
+  await page.getByRole('button', { name: /运行/ }).click();
+  await page.waitForSelector('.why-tip', { timeout: 10000 });
+  const idleText = await page.locator('.why-banner').innerText();
+  check('说明区默认显示引导文案', /鼠标移到/.test(idleText), idleText.slice(0, 24));
+
+  await page.locator('.diag-head').first().hover();
+  await page.waitForTimeout(400);
+  const whyText = await page.locator('.why-banner').innerText();
+  check(
+    '悬停诊断显示规则原理与正确做法',
+    /原理/.test(whyText) && /正确做法/.test(whyText),
+    whyText.replace(/\n/g, ' ').slice(0, 40),
+  );
+  await page.screenshot({ path: `${OUT_DIR}/11-rule-why.png` });
 } catch (error) {
   check('执行过程无异常', false, error instanceof Error ? error.message : String(error));
 } finally {

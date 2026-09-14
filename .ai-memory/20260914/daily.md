@@ -30,3 +30,14 @@
 - 结构：结论先行 → 全景时间线（8 阶段 / 25 提交）→ 逐阶段拆解（7 节）→ 可复用流程模型（六阶段门禁表 / 文档三件套 / 证据优先）→ 人机分工边界 → 8 条踩坑→规则化沉淀 → 产出度量 → 可复制 Checklist → 适用边界 → 提交时间线附录
 - 数据来源：`git log --reverse` 时间线、源码/文档行数统计（77 文件 8511 行 / 4226 行文档 / 89 例测试 / 31 项冒烟）
 - 注意：本轮推送因网络抖动失败（仅 .gitignore 一条改动待推送，不影响文档本地留存）
+
+## [02:0x] 动作: 器件直连（Q-T2）+ 画布错误边界（提交 3701c62）
+
+- 决策：放开「组件端口 ↔ 组件端口」直连（电机→驱动模块输出、外设→独立电源模块），仍禁止「引脚 ↔ 引脚」
+- 引擎：contracts 加 `power-source`；nets.ts 加 `netHasBoardPower/netHasIndependentPower/netHasPowerSource`；R-06 识别独立电源、R-15 区分板载/独立供电
+- 语义修正：dc-motor 端口 role `power → passive`（无源负载）；R-22 拦 power+passive；R-15 同口径
+- 组件：3.3V 电源模块（14 个组件）
+- 健壮性：`CanvasErrorBoundary`（第三方库异常不再白屏）+ 诊断定位前校验目标存在（对已卸载节点 fitView 会抛 `getBoundingClientRect of null` —— 预览 WebView 报的就是这类）
+- **环境坑（重要）**：改 packages 后必须 `build:packages` + 重启 api + 重启 web（或清 `.vite`）；本次因后端进程持旧模块，冒烟一度报出旧的 R-06 文案，靠文案比对定位
+- 验证：103 例全绿（51/15/37）、冒烟 33 项（含真实拖拽创建直连）、typecheck 0 error、构建成功、后端 14 组件/20 规则
+- 预览：按要求用 IDE 内置浏览器打开

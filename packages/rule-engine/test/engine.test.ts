@@ -138,7 +138,7 @@ describe('正确接线（示例项目）', () => {
     expect(RULE_SET_VERSION).toMatch(/^rules-[a-z0-9]+$/);
     const info = getRuleSetInfo();
     expect(info.version).toBe(RULE_SET_VERSION);
-    expect(info.rules.length).toBeGreaterThanOrEqual(19);
+    expect(info.rules.length).toBeGreaterThanOrEqual(20);
     expect(info.rules.find((rule) => rule.code === 'R-01')?.enabled).toBe(true);
   });
 });
@@ -516,6 +516,70 @@ describe('新增经典组件与规则（R-15 独立供电 / R-20 串口交叉 / 
     );
     expect(result.status).toBe('passed');
     expect(result.diagnostics).toHaveLength(0);
+  });
+});
+
+describe('第二批组件与 R-22（负载需驱动模块）', () => {
+  it('组件库包含第二批新增组件', () => {
+    const slugs = COMPONENTS.map((def) => def.slug);
+    for (const slug of ['lcd1602-i2c', 'l298n', 'dc-motor', 'buzzer-passive']) {
+      expect(slugs).toContain(slug);
+    }
+  });
+
+  it('直流电机直连 GPIO → R-22（必须经驱动模块）', () => {
+    const motor = instance('c-motor', 'dc-motor', '电机-1', { externalSupply: false });
+    const result = run([motor], [
+      wire('pin-esp32-gpio18', 'c-motor', '+'),
+      wire('pin-esp32-gnd-1', 'c-motor', '-'),
+    ]);
+    const r22 = result.diagnostics.find((item) => item.code === 'R-22');
+    expect(r22?.severity).toBe('error');
+    expect(r22?.message).toContain('GPIO18');
+  });
+
+  it('直流电机接板载 3V3 时不报 R-22（由 R-15 提示需独立供电）', () => {
+    const motor = instance('c-motor', 'dc-motor', '电机-1', { externalSupply: false });
+    const result = run([motor], [
+      wire('pin-esp32-3v3', 'c-motor', '+'),
+      wire('pin-esp32-gnd-1', 'c-motor', '-'),
+    ]);
+    expect(codes(result)).not.toContain('R-22');
+    expect(codes(result)).toContain('R-15');
+  });
+
+  it('L298N 控制侧接 GPIO（ENA/IN1/IN2）不触发 R-22', () => {
+    const driver = instance('c-l298', 'l298n', 'L298N-1', { externalSupply: true });
+    const result = run([driver], [
+      wire('pin-esp32-gpio25', 'c-l298', 'ENA'),
+      wire('pin-esp32-gpio26', 'c-l298', 'IN1'),
+      wire('pin-esp32-gpio27', 'c-l298', 'IN2'),
+      wire('pin-esp32-gnd-1', 'c-l298', 'GND'),
+      wire('pin-esp32-5v', 'c-l298', '+12V'),
+    ]);
+    expect(codes(result)).not.toContain('R-22');
+  });
+
+  it('无源蜂鸣器正确接线（+ 接 GPIO / - 接 GND）→ 全部通过', () => {
+    const buzzer = instance('c-bp', 'buzzer-passive', '无源蜂鸣器-1', {});
+    const result = run([buzzer], [
+      wire('pin-esp32-gpio13', 'c-bp', '+'),
+      wire('pin-esp32-gnd-1', 'c-bp', '-'),
+    ]);
+    expect(result.status).toBe('passed');
+    expect(result.diagnostics).toHaveLength(0);
+  });
+
+  it('LCD1602 与 OLED 同时使用同一地址 → R-13（地址冲突）', () => {
+    const oled = instance('c-oled', 'ssd1306-i2c', 'OLED-1', { address: '0x3C', pullup: true });
+    const lcd = instance('c-lcd', 'lcd1602-i2c', 'LCD1602-1', { address: '0x3C', pullup: true });
+    const result = run([oled, lcd], [
+      wire('pin-esp32-gpio21', 'c-oled', 'SDA'),
+      wire('pin-esp32-gpio22', 'c-oled', 'SCL'),
+      wire('pin-esp32-gpio21', 'c-lcd', 'SDA'),
+      wire('pin-esp32-gpio22', 'c-lcd', 'SCL'),
+    ]);
+    expect(codes(result)).toContain('R-13');
   });
 });
 

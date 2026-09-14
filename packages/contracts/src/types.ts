@@ -7,7 +7,11 @@
 
 /* ------------------------------ 开发板 / 引脚 ------------------------------ */
 
-export type VoltageDomain = '3V3' | '5V' | 'GND';
+/**
+ * 电压域：3V3 / 5V / GND 为板上常见电平；
+ * VIN 表示"外部电源输入"（如电机驱动的 7–12V），用于表达需要独立电源的端口。
+ */
+export type VoltageDomain = '3V3' | '5V' | 'VIN' | 'GND';
 
 /** 引脚能力标签：用于 UI 色条与规则判定 */
 export type Capability =
@@ -99,7 +103,9 @@ export type RequirementKind =
   | 'input-pull'
   | 'signal-voltage-match'
   /** 大电流负载（舵机/电机/超声波等）：建议独立供电，板载 LDO 电流有限（R-15） */
-  | 'external-power';
+  | 'external-power'
+  /** 负载必须经驱动模块（电机等）：不可直连 GPIO（R-22） */
+  | 'needs-driver';
 
 export interface PortOptionDef {
   key: string;

@@ -5,8 +5,12 @@
 import type { BoardDef, ComponentCategory, ComponentDef } from '@sim/contracts';
 import { ESP32_DEVKITC_V4 } from './boards/esp32-devkitc-v4';
 import { BUZZER_ACTIVE } from './components/buzzer-active';
+import { BUZZER_PASSIVE } from './components/buzzer-passive';
+import { DC_MOTOR } from './components/dc-motor';
 import { DHT11 } from './components/dht11';
 import { HC_SR04 } from './components/hc-sr04';
+import { L298N } from './components/l298n';
+import { LCD1602_I2C } from './components/lcd1602-i2c';
 import { LED } from './components/led';
 import { PUSH_BUTTON } from './components/push-button';
 import { RESISTOR } from './components/resistor';
@@ -17,8 +21,12 @@ import { USB_TTL } from './components/usb-ttl';
 export {
   ESP32_DEVKITC_V4,
   BUZZER_ACTIVE,
+  BUZZER_PASSIVE,
+  DC_MOTOR,
   DHT11,
   HC_SR04,
+  L298N,
+  LCD1602_I2C,
   LED,
   PUSH_BUTTON,
   RESISTOR,
@@ -29,15 +37,20 @@ export {
 
 export const BOARDS: BoardDef[] = [ESP32_DEVKITC_V4];
 
+/** 组件库清单（组件库面板按 category 分组渲染，与数组顺序无关） */
 export const COMPONENTS: ComponentDef[] = [
   DHT11,
   HC_SR04,
   SSD1306_I2C,
+  LCD1602_I2C,
   LED,
-  PUSH_BUTTON,
   BUZZER_ACTIVE,
+  BUZZER_PASSIVE,
   SERVO_SG90,
+  DC_MOTOR,
+  L298N,
   USB_TTL,
+  PUSH_BUTTON,
   RESISTOR,
 ];
 

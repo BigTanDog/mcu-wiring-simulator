@@ -173,6 +173,10 @@ try {
     'LED 发光二极管',
     '轻触按键',
     '电阻（1/4W）',
+    'LCD1602（I2C 背包）',
+    'L298N 电机驱动',
+    '直流电机',
+    '无源蜂鸣器',
   ];
   const missingLib = expectedLib.filter((name) => !libText.includes(name));
   check(

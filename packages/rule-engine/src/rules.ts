@@ -6,8 +6,8 @@
  *  - 必须声明 meta（code/name/severity/scope/tags），由引擎统一编排；
  *  - 禁止判断组件 slug 写专属分支：组件差异一律走 requirements / portOptions（D-10）。
  *
- * 当前实现 16 条：R-01/03/05/06/07/08/09/10/11/12/13/14/16/17/18/19。
- * 未实现（依赖尚未引入的组件类型）：R-02、R-04、R-15、R-20（R-02/R-04 语义已被 R-06/R-07/R-03 覆盖）。
+ * 当前实现 20 条：R-01/03/05/06/07/08/09/10/11/12/13/14/15/16/17/18/19/20/21/22。
+ * 未实现：R-02（悬空电源/地）、R-04（输出-输出冲突）—— 语义已分别被 R-06/R-07 与 R-03 覆盖（见技术设计文档 Q-T1）。
  */
 import type {
   BoardDef,
@@ -832,6 +832,41 @@ const R21_VOLTAGE_MISMATCH: Rule = {
   },
 };
 
+const R22_NEEDS_DRIVER: Rule = {
+  meta: {
+    code: 'R-22',
+    name: '负载直连 GPIO（需驱动模块）',
+    severity: 'error',
+    scope: 'connection',
+    tags: ['electrical'],
+  },
+  run: (input) => {
+    const out: Diagnostic[] = [];
+    for (const pair of signalPinPairs(input)) {
+      // 组件声明式需求驱动（直流电机等），不针对具体 slug
+      if (!pair.def.requirements.includes('needs-driver')) continue;
+      const port = portOf(pair.def, pair.portId);
+      if (!port || port.role !== 'power') continue;
+      // 只拦"接到 GPIO"：接到电源引脚的情形由 R-15（需独立供电）处理
+      if (pair.pin.kind !== 'io') continue;
+
+      out.push({
+        code: 'R-22',
+        severity: 'error',
+        message: `${pair.instance.label}.${port.name} 直接接在 ${pair.pin.physicalLabel}（GPIO）上，电机类负载不能由 GPIO 直接驱动`,
+        suggestion:
+          '用电机驱动模块（如 L298N）中转：GPIO 只接控制脚（IN1–IN4 / ENA / ENB），电机接驱动模块输出端（OUT1/OUT2），驱动模块使用独立电源并与开发板共地。',
+        targets: [
+          pinTarget(pair.pin.id),
+          portTarget(pair.instance.id, pair.portId),
+          { type: 'connection', id: pair.connection.id },
+        ],
+      });
+    }
+    return out;
+  },
+};
+
 export const RULES: Rule[] = [
   R01_REQUIRED_PORT,
   R03_PIN_MULTIPLE_USE,
@@ -852,4 +887,5 @@ export const RULES: Rule[] = [
   R19_LED_SERIES_RESISTOR,
   R20_UART_CROSS,
   R21_VOLTAGE_MISMATCH,
+  R22_NEEDS_DRIVER,
 ];

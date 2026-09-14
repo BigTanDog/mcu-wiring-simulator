@@ -9,7 +9,7 @@ import { z } from 'zod';
 
 /* --------------------------------- 基础 --------------------------------- */
 
-export const voltageDomainSchema = z.enum(['3V3', '5V', 'GND']);
+export const voltageDomainSchema = z.enum(['3V3', '5V', 'VIN', 'GND']);
 
 export const pinDefSchema = z.object({
   id: z.string().min(1).max(64),

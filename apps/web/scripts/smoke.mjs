@@ -414,6 +414,24 @@ try {
   );
   await page.screenshot({ path: `${OUT_DIR}/19-diag-group.png` });
 
+  // 结果面板列表必须能滚动（曾因 flex 子项缺 min-height:0 导致内容溢出被裁切）
+  const listScroll = await page.locator('.result-list').evaluate((element) => {
+    const before = element.scrollTop;
+    element.scrollTop = element.scrollHeight;
+    return {
+      canScroll: element.scrollHeight > element.clientHeight,
+      before,
+      after: element.scrollTop,
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight,
+    };
+  });
+  check(
+    '结果面板列表内容不被裁切（溢出时可滚动）',
+    !listScroll.canScroll || listScroll.after > listScroll.before,
+    JSON.stringify(listScroll),
+  );
+
   // 面包板（简化模型）：孔位网格节点 + 一拖多模板
   await page.getByRole('button', { name: '项目管理' }).click();
   await page.waitForSelector('.template-card', { timeout: 5000 });

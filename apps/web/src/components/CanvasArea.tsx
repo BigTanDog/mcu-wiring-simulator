@@ -231,7 +231,9 @@ export const CanvasArea = () => {
       */}
       {!hintDismissed && !hasRun && instanceCount === 0 ? (
         <div className="canvas-hint">
-          <span>操作提示：从左栏拖入组件 → 从端口拖到开发板引脚连线 → 右上角「运行」校验</span>
+          <span>
+            操作提示：从左栏拖入组件 → 从端口拖到开发板引脚（或另一个组件的端口）连线 → 右上角「运行」校验
+          </span>
           <button
             type="button"
             className="hint-close"

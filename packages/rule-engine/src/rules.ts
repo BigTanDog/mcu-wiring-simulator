@@ -21,7 +21,14 @@ import type {
   RequirementKind,
   RuleDescriptor,
 } from '@sim/contracts';
-import { hasPassiveComponent, netOfPort, type Net } from './nets';
+import {
+  hasPassiveComponent,
+  netHasBoardPower,
+  netHasIndependentPower,
+  netHasPowerSource,
+  netOfPort,
+  type Net,
+} from './nets';
 
 export interface RuleInput {
   board: BoardDef;
@@ -261,13 +268,15 @@ const R06_POWER_SOURCE_MISSING: Rule = {
         (item) => portRoleOf(item.def, item.portId) === 'power',
       );
       if (powerPorts.length === 0) continue;
-      if (net.pins.some(isPowerPin)) continue;
+      // 有效来源：开发板电源引脚，或独立电源模块（器件直连供电）
+      if (netHasPowerSource(net)) continue;
       const first = powerPorts[0];
       out.push({
         code: 'R-06',
         severity: 'error',
-        message: `${first.instance.label}.${portNameOf(first.def, first.portId)} 未接到开发板电源引脚`,
-        suggestion: '把 VCC 接到开发板 3V3（模块允许时可用 5V/VIN），并确保共地。',
+        message: `${first.instance.label}.${portNameOf(first.def, first.portId)} 未接到有效电源（开发板引脚或独立电源模块）`,
+        suggestion:
+          '把 VCC 接到开发板 3V3（模块允许时可用 5V/VIN），或接到独立电源模块的输出，并确保共地。',
         targets: powerPorts.map((item) => portTarget(item.instance.id, item.portId)),
       });
     }
@@ -603,17 +612,23 @@ const R15_EXTERNAL_POWER: Rule = {
       if (!def || !def.requirements.includes('external-power')) continue;
       if (satisfiedByConfig(def, instance, 'external-power')) continue;
 
-      const powerPorts = def.ports.filter((port) => port.role === 'power');
+      // 供电入口（power）与负载端（passive，如电机 ±）都要检查是否由板载 LDO 供电
+      const powerPorts = def.ports.filter(
+        (port) => port.role === 'power' || port.role === 'passive',
+      );
       const connected = powerPorts.filter((port) =>
         isPortConnected(connections, instance.id, port.id),
       );
       if (connected.length === 0) continue;
 
+      // 已由独立电源模块供电 → 视为已处理（器件直连场景）
+      if (
+        connected.some((port) => netHasIndependentPower(netOfPort(nets, instance.id, port.id)))
+      ) {
+        continue;
+      }
       // 是否由开发板板载电源引脚供电（板载 LDO 输出电流有限）
-      const fromBoard = connected.some((port) => {
-        const net = netOfPort(nets, instance.id, port.id);
-        return net ? net.pins.some(isPowerPin) : false;
-      });
+      const fromBoard = connected.some((port) => netHasBoardPower(netOfPort(nets, instance.id, port.id)));
       if (!fromBoard) continue;
 
       out.push({
@@ -846,7 +861,8 @@ const R22_NEEDS_DRIVER: Rule = {
       // 组件声明式需求驱动（直流电机等），不针对具体 slug
       if (!pair.def.requirements.includes('needs-driver')) continue;
       const port = portOf(pair.def, pair.portId);
-      if (!port || port.role !== 'power') continue;
+      // 拦"用电端口"（power 供电入口 / passive 负载端），信号与地不管
+      if (!port || port.role === 'ground' || port.role === 'signal') continue;
       // 只拦"接到 GPIO"：接到电源引脚的情形由 R-15（需独立供电）处理
       if (pair.pin.kind !== 'io') continue;
 

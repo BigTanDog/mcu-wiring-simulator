@@ -105,7 +105,9 @@ export type RequirementKind =
   /** 大电流负载（舵机/电机/超声波等）：建议独立供电，板载 LDO 电流有限（R-15） */
   | 'external-power'
   /** 负载必须经驱动模块（电机等）：不可直连 GPIO（R-22） */
-  | 'needs-driver';
+  | 'needs-driver'
+  /** 该组件可作为独立电源来源（电源模块）：R-06 视其为有效来源，R-15 视为已独立供电 */
+  | 'power-source';
 
 export interface PortOptionDef {
   key: string;

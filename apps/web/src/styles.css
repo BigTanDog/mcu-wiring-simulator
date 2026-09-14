@@ -1109,6 +1109,45 @@ button {
   color: var(--muted);
 }
 
+/* ------------------------ 画布异常兜底（错误边界） ------------------------ */
+
+.stage-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 100%;
+  padding: 28px;
+  text-align: center;
+  background: var(--bg);
+}
+
+.stage-fallback strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.stage-fallback-msg {
+  max-width: 520px;
+  color: var(--error);
+  font-size: 11.5px;
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.stage-fallback-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.stage-fallback-hint {
+  max-width: 460px;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
 /* -------------------- 诊断条目的「为什么」悬停说明 -------------------- */
 
 .why-tip {

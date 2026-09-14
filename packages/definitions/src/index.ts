@@ -12,6 +12,7 @@ import { HC_SR04 } from './components/hc-sr04';
 import { L298N } from './components/l298n';
 import { LCD1602_I2C } from './components/lcd1602-i2c';
 import { LED } from './components/led';
+import { POWER_3V3 } from './components/power-3v3';
 import { PUSH_BUTTON } from './components/push-button';
 import { RESISTOR } from './components/resistor';
 import { SERVO_SG90 } from './components/servo-sg90';
@@ -28,6 +29,7 @@ export {
   L298N,
   LCD1602_I2C,
   LED,
+  POWER_3V3,
   PUSH_BUTTON,
   RESISTOR,
   SERVO_SG90,
@@ -52,6 +54,7 @@ export const COMPONENTS: ComponentDef[] = [
   USB_TTL,
   PUSH_BUTTON,
   RESISTOR,
+  POWER_3V3,
 ];
 
 /** 组件库分组顺序即此对象的键顺序（主控 → 传感器 → 通信 → 显示 → 执行器 → 电源/基础） */

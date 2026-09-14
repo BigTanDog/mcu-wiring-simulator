@@ -1,6 +1,7 @@
 import { ReactFlowProvider } from '@xyflow/react';
 import { useEffect } from 'react';
 import { CanvasArea } from './components/CanvasArea';
+import { CanvasErrorBoundary } from './components/CanvasErrorBoundary';
 import { InspectorPanel } from './components/InspectorPanel';
 import { LibraryPanel } from './components/LibraryPanel';
 import { ProjectPanel } from './components/ProjectPanel';
@@ -36,7 +37,9 @@ export default function App() {
             <LibraryPanel />
             <InspectorPanel />
           </aside>
-          <CanvasArea />
+          <CanvasErrorBoundary>
+            <CanvasArea />
+          </CanvasErrorBoundary>
         </div>
         <ProjectPanel />
         <ShortcutsPanel />

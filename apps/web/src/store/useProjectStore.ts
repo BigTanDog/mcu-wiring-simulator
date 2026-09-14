@@ -483,13 +483,10 @@ export const useProjectStore = create<ProjectState>()(
           showToast('不能把端口连接到自身', 'warn');
           return;
         }
-        if (from.type === to.type) {
-          showToast(
-            from.type === 'port'
-              ? '请通过开发板引脚连线：组件 → 引脚 → 组件'
-              : '两根引脚之间不能直接连线',
-            'warn',
-          );
+        // 器件直连（端口 ↔ 端口）是允许的：电机接驱动模块输出、外设接独立电源都会用到；
+        // 仅禁止「引脚 ↔ 引脚」——两个引脚直接相连属于焊接/跳线，不是接线图语义
+        if (from.type === 'pin' && to.type === 'pin') {
+          showToast('两根引脚之间不能直接连线：请从组件端口开始接线', 'warn');
           return;
         }
         const duplicated = connections.some(

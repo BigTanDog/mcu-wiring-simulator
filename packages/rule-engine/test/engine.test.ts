@@ -51,6 +51,25 @@ const run = (
   options?: Parameters<typeof validateProject>[0]['options'],
 ) => validateProject({ board: BOARD, instances, connections, defs: DEFS, options });
 
+/** 组件端口 ↔ 组件端口（器件直连：电机接驱动输出、外设接独立电源） */
+const wirePorts = (
+  fromInstance: string,
+  fromPort: string,
+  toInstance: string,
+  toPort: string,
+  kind: Connection['kind'] = 'power',
+  enabled = true,
+): Connection => {
+  seq += 1;
+  return {
+    id: `e-pp-${seq}`,
+    from: { type: 'port', instanceId: fromInstance, portId: fromPort },
+    to: { type: 'port', instanceId: toInstance, portId: toPort },
+    kind,
+    enabled,
+  };
+};
+
 const codes = (result: ReturnType<typeof run>): string[] =>
   [...new Set(result.diagnostics.map((item) => item.code))].sort();
 
@@ -580,6 +599,61 @@ describe('第二批组件与 R-22（负载需驱动模块）', () => {
       wire('pin-esp32-gpio22', 'c-lcd', 'SCL'),
     ]);
     expect(codes(result)).toContain('R-13');
+  });
+});
+
+describe('器件直连与独立电源（Q-T2 决策后新增）', () => {
+  const driverWires = (driverId: string): Connection[] => [
+    wire('pin-esp32-gpio25', driverId, 'ENA'),
+    wire('pin-esp32-gpio26', driverId, 'IN1'),
+    wire('pin-esp32-gpio27', driverId, 'IN2'),
+    wire('pin-esp32-gnd-1', driverId, 'GND'),
+    wire('pin-esp32-5v', driverId, '+12V'),
+  ];
+
+  it('电机接驱动模块输出端（端口↔端口）→ 不报 R-22，也不误报 R-06', () => {
+    const driver = instance('c-l298', 'l298n', 'L298N-1', { externalSupply: true });
+    const motor = instance('c-motor', 'dc-motor', '电机-1', { externalSupply: true });
+    const result = run([driver, motor], [
+      ...driverWires('c-l298'),
+      wirePorts('c-l298', 'OUT1', 'c-motor', '+'),
+      wirePorts('c-l298', 'OUT2', 'c-motor', '-'),
+    ]);
+    expect(codes(result)).not.toContain('R-22');
+    expect(codes(result)).not.toContain('R-06');
+  });
+
+  it('独立电源模块给 DHT11 供电（端口↔端口）→ 不报 R-06', () => {
+    const power = instance('c-pwr', 'power-3v3', '电源-1', {});
+    const result = run([power, dht11(true)], [
+      wire('pin-esp32-gnd-1', 'c-pwr', 'GND'),
+      wirePorts('c-pwr', 'OUT', 'c-dht11', 'VCC'),
+      wire('pin-esp32-gpio4', 'c-dht11', 'DATA'),
+      wire('pin-esp32-gnd-2', 'c-dht11', 'GND'),
+    ]);
+    expect(codes(result)).not.toContain('R-06');
+  });
+
+  it('舵机由独立电源模块供电 → 不报 R-15', () => {
+    const power = instance('c-pwr', 'power-3v3', '电源-1', {});
+    const servo = instance('c-servo', 'servo-sg90', 'SG90-1', { externalSupply: false });
+    const result = run([power, servo], [
+      wire('pin-esp32-gnd-1', 'c-pwr', 'GND'),
+      wirePorts('c-pwr', 'OUT', 'c-servo', 'VCC'),
+      wire('pin-esp32-gpio13', 'c-servo', 'SIG'),
+      wire('pin-esp32-gnd-2', 'c-servo', 'GND'),
+    ]);
+    expect(codes(result)).not.toContain('R-15');
+  });
+
+  it('对照组：仍由板载 3V3 供电的舵机照旧报 R-15', () => {
+    const servo = instance('c-servo', 'servo-sg90', 'SG90-1', { externalSupply: false });
+    const result = run([servo], [
+      wire('pin-esp32-3v3', 'c-servo', 'VCC'),
+      wire('pin-esp32-gpio13', 'c-servo', 'SIG'),
+      wire('pin-esp32-gnd-1', 'c-servo', 'GND'),
+    ]);
+    expect(codes(result)).toContain('R-15');
   });
 });
 

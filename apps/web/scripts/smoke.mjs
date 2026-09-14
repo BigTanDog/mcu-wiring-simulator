@@ -307,6 +307,60 @@ try {
     (await page.locator('.react-flow__node.selected').count()) === 0,
   );
   await page.screenshot({ path: `${OUT_DIR}/13-delete-hotkey.png` });
+
+  // 14. 器件直连（Q-T2）：在画布上真实拖拽「驱动模块 OUTPUT → 电机 +」
+  await page.getByRole('button', { name: /清空画布/ }).click();
+  await page.waitForTimeout(400);
+  const ids = await page.evaluate(() => {
+    const store = window.__SIM_STORE__;
+    store.getState().addInstance('l298n', { x: 40, y: 30 });
+    store.getState().addInstance('dc-motor', { x: 360, y: 420 });
+    const instances = store.getState().instances;
+    return {
+      driver: instances.find((item) => item.definitionSlug === 'l298n').id,
+      motor: instances.find((item) => item.definitionSlug === 'dc-motor').id,
+    };
+  });
+  await page.waitForTimeout(500);
+  // 先适配视图：若节点落在视口外，鼠标事件无法命中 Handle（坐标陷阱）
+  await page.keyboard.press('f');
+  await page.waitForTimeout(700);
+
+  const edgesBefore = await page.locator('.react-flow__edge').count();
+  const srcHandle = page.locator(`.react-flow__handle[data-handleid="port:${ids.driver}:OUT1"]`);
+  const dstHandle = page.locator(`.react-flow__handle[data-handleid="port:${ids.motor}:+"]`);
+  const srcBox = await srcHandle.boundingBox();
+  const dstBox = await dstHandle.boundingBox();
+  if (srcBox && dstBox) {
+    await page.mouse.move(srcBox.x + srcBox.width / 2, srcBox.y + srcBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(dstBox.x + dstBox.width / 2, dstBox.y + dstBox.height / 2, { steps: 14 });
+    await page.mouse.up();
+    await page.waitForTimeout(600);
+  }
+  const edgesAfter = await page.locator('.react-flow__edge').count();
+  const nodesRendered = await page.locator('.react-flow__node').count();
+  check(
+    '器件直连（端口 → 端口）可在画布上创建',
+    edgesAfter === edgesBefore + 1,
+    `${edgesBefore} → ${edgesAfter}；节点=${nodesRendered}；src=${await srcHandle.count()}(${
+      srcBox ? `${Math.round(srcBox.x)},${Math.round(srcBox.y)}` : 'no-box'
+    }) dst=${await dstHandle.count()}(${
+      dstBox ? `${Math.round(dstBox.x)},${Math.round(dstBox.y)}` : 'no-box'
+    })`,
+  );
+
+  // 器件直连后运行校验：电机由驱动模块供电，不应报 R-22/R-06
+  await page.getByRole('button', { name: /运行/ }).click();
+  await page.waitForTimeout(1500);
+  const directCodes = await page.locator('.result-list .diag-code').allInnerTexts();
+  const directMsgs = await page.locator('.result-list .diag-msg').allInnerTexts();
+  check(
+    '电机经驱动模块连接后无 R-22 / R-06',
+    !directCodes.includes('R-22') && !directCodes.includes('R-06'),
+    `诊断：${directCodes.map((code, idx) => `${code}:${(directMsgs[idx] ?? '').slice(0, 28)}`).join(' | ')}`,
+  );
+  await page.screenshot({ path: `${OUT_DIR}/14-direct-connection.png` });
 } catch (error) {
   check('执行过程无异常', false, error instanceof Error ? error.message : String(error));
 } finally {

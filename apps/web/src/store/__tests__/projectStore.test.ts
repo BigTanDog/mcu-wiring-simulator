@@ -71,40 +71,47 @@ describe('项目流程（store 集成）', () => {
     expect(result?.ruleSetVersion).toMatch(/^rules-/);
   });
 
-  it('连线约束：端口不能直连端口，也不能自连；重复连线被拒绝', () => {
+  it('连线约束：允许器件直连；自连、引脚直连与重复连线被拒绝', () => {
     useProjectStore.getState().addInstance('dht11', { x: 0, y: 0 });
     useProjectStore.getState().addInstance('ssd1306-i2c', { x: 0, y: 200 });
     const [dht, oled] = useProjectStore.getState().instances;
 
-    // 组件端口之间直连 → 拒绝
+    // 器件直连（端口 ↔ 端口）→ 允许：电机接驱动输出、外设接独立电源都依赖它（Q-T2 决策）
     useProjectStore.getState().addConnection(
       { type: 'port', instanceId: dht.id, portId: 'DATA' },
       { type: 'port', instanceId: oled.id, portId: 'SDA' },
     );
-    expect(useProjectStore.getState().connections).toHaveLength(0);
-    expect(useProjectStore.getState().toast?.kind).toBe('warn');
+    expect(useProjectStore.getState().connections).toHaveLength(1);
 
     // 自连 → 拒绝
     useProjectStore.getState().addConnection(
       { type: 'port', instanceId: dht.id, portId: 'DATA' },
       { type: 'port', instanceId: dht.id, portId: 'DATA' },
     );
-    expect(useProjectStore.getState().connections).toHaveLength(0);
+    expect(useProjectStore.getState().connections).toHaveLength(1);
 
-    // 正常连线 → 成功，且类型被推导为 signal
+    // 引脚 ↔ 引脚 → 拒绝（焊接/跳线语义，不是接线图）
+    useProjectStore.getState().addConnection(
+      { type: 'pin', pinId: 'pin-esp32-gpio4' },
+      { type: 'pin', pinId: 'pin-esp32-gpio5' },
+    );
+    expect(useProjectStore.getState().connections).toHaveLength(1);
+    expect(useProjectStore.getState().toast?.kind).toBe('warn');
+
+    // 正常连线（引脚 ↔ 端口）→ 成功，且类型被推导为 signal
     useProjectStore.getState().addConnection(
       { type: 'pin', pinId: 'pin-esp32-gpio4' },
       { type: 'port', instanceId: dht.id, portId: 'DATA' },
     );
-    expect(useProjectStore.getState().connections).toHaveLength(1);
-    expect(useProjectStore.getState().connections[0].kind).toBe('signal');
+    expect(useProjectStore.getState().connections).toHaveLength(2);
+    expect(useProjectStore.getState().connections[1].kind).toBe('signal');
 
     // 重复连线 → 拒绝
     useProjectStore.getState().addConnection(
       { type: 'pin', pinId: 'pin-esp32-gpio4' },
       { type: 'port', instanceId: dht.id, portId: 'DATA' },
     );
-    expect(useProjectStore.getState().connections).toHaveLength(1);
+    expect(useProjectStore.getState().connections).toHaveLength(2);
   });
 
   it('导出 → 清空 → 导入：往返一致（AC-07）', () => {

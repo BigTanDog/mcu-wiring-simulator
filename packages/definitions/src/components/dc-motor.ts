@@ -12,7 +12,9 @@ export const DC_MOTOR: ComponentDef = {
     {
       id: '+',
       name: '+',
-      role: 'power',
+      // 电机是无源负载（不是电源入口）：接驱动模块输出端（OUT1/OUT2），
+      // 因此 role=passive —— 不影响 R-22/R-15 的拦截，但避免 R-06 误判"缺电源来源"
+      role: 'passive',
       direction: 'in',
       voltageDomain: 'VIN',
       required: true,
@@ -21,7 +23,7 @@ export const DC_MOTOR: ComponentDef = {
     {
       id: '-',
       name: '-',
-      role: 'power',
+      role: 'passive',
       direction: 'in',
       voltageDomain: 'VIN',
       required: true,

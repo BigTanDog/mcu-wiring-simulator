@@ -37,14 +37,28 @@ export const ValidationPanel = () => {
   const [whyCode, setWhyCode] = useState<string | null>(null);
   const whyDoc = whyCode ? ruleDocOf(whyCode) : undefined;
 
+  /**
+   * 定位前先确认目标仍在画布中：诊断可能来自上一次校验，其间用户可能已
+   * 删除组件或撤销操作 —— 对已卸载节点调用 fitView 会触发第三方库异常。
+   */
   const focus = (target: DiagnosticTarget) => {
+    const scene = useProjectStore.getState();
+
     if (target.type === 'instance') {
+      if (!scene.instances.some((item) => item.id === target.id)) {
+        scene.showToast('该组件已不在画布中（可能已被删除或撤销）', 'warn');
+        return;
+      }
       selectInstance(target.id);
       void fitView({ nodes: [{ id: target.id }], duration: 400, maxZoom: 1.1 });
       return;
     }
     if (target.type === 'port') {
       if (target.instanceId) {
+        if (!scene.instances.some((item) => item.id === target.instanceId)) {
+          scene.showToast('该组件已不在画布中（可能已被删除或撤销）', 'warn');
+          return;
+        }
         selectInstance(target.instanceId);
         void fitView({ nodes: [{ id: target.instanceId }], duration: 400, maxZoom: 1.1 });
       }
@@ -56,6 +70,10 @@ export const ValidationPanel = () => {
       return;
     }
     if (target.type === 'connection') {
+      if (!scene.connections.some((item) => item.id === target.id)) {
+        scene.showToast('该连线已不存在', 'warn');
+        return;
+      }
       selectConnection(target.id);
     }
   };

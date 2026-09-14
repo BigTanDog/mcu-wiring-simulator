@@ -113,3 +113,15 @@ export const hasPassiveComponent = (net: Net | undefined, excludeInstanceId?: st
     return item.def.ports.some((port) => port.id === item.portId && port.role === 'passive');
   });
 };
+
+/** net 中是否存在开发板电源引脚（板载供电） */
+export const netHasBoardPower = (net: Net | undefined): boolean =>
+  !!net && net.pins.some((pin) => pin.kind === 'power');
+
+/** net 中是否存在独立电源模块（声明 power-source 的组件）—— 器件直连供电场景 */
+export const netHasIndependentPower = (net: Net | undefined): boolean =>
+  !!net && net.ports.some((item) => item.def.requirements.includes('power-source'));
+
+/** 是否存在有效电源来源：板载电源引脚，或独立电源模块（R-06 判定用） */
+export const netHasPowerSource = (net: Net | undefined): boolean =>
+  netHasBoardPower(net) || netHasIndependentPower(net);

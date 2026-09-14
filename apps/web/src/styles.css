@@ -1317,6 +1317,74 @@ button {
   color: var(--muted);
 }
 
+/* 诊断分组（Q-T5）：同一规则的多处命中折叠为一行，展开看每条明细 */
+.diag-group {
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: 8px;
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.diag-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.diag-group-head:hover {
+  background: var(--panel-soft);
+}
+
+.diag-group-title {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.diag-group-count {
+  margin-left: auto;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--chip-bg);
+  color: var(--chip-fg);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.diag-group-caret {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.diag-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 10px 10px;
+}
+
+/* 组内条目：不再重复组标题已有的规则码/严重度，去掉边框与底色，仅用左侧细线表示层级 */
+.diag-item.diag-item-nested {
+  padding: 2px 0 2px 10px;
+  border: none;
+  border-left: 2px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.diag-index {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
 .diag-item {
   padding: 8px 10px;
   border: 1px solid var(--border);

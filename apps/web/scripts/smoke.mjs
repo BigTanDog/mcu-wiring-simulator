@@ -388,6 +388,31 @@ try {
   );
   await page.screenshot({ path: `${OUT_DIR}/18-lab-project.png` });
 
+  // 诊断按规则分组（Q-T5）：同规则的多处命中折叠为一行，展开后逐条可见
+  await page.getByRole('button', { name: /运行/ }).click();
+  await page.waitForFunction(() => !!document.querySelector('.result-status'), undefined, {
+    timeout: 15000,
+  });
+  await page.waitForTimeout(400);
+  const groupCount = await page.locator('.diag-group').count();
+  const nestedBeforeExpand = await page.locator('.diag-item-nested').count();
+  const r16Group = await page.locator('.diag-group', { hasText: 'R-16' }).first().innerText();
+  check(
+    '同规则的多处命中折叠为一行（R-16 标题显示处数）',
+    groupCount >= 2 && nestedBeforeExpand === 0 && /5 处/.test(r16Group),
+    `分组=${groupCount} 展开前明细=${nestedBeforeExpand} · R-16: ${r16Group.replace(/\n/g, ' ')}`,
+  );
+
+  await page.locator('.diag-group-head', { hasText: 'R-16' }).first().click();
+  await page.waitForTimeout(300);
+  const nestedAfterExpand = await page.locator('.diag-item-nested').count();
+  check(
+    '展开分组后显示全部明细（R-16 共 5 条）',
+    nestedAfterExpand === 5,
+    `展开后明细=${nestedAfterExpand}`,
+  );
+  await page.screenshot({ path: `${OUT_DIR}/19-diag-group.png` });
+
   await page.getByRole('button', { name: /运行/ }).click();
   await page.waitForTimeout(1600);
   const templateStatus = await page.locator('.result-status').innerText();

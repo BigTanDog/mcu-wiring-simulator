@@ -4,10 +4,11 @@
  *  - 诊断列表：严重度 + 规则码 + 结论 + 修复建议 + 可点击定位（画布高亮并聚焦）
  */
 import { useReactFlow } from '@xyflow/react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { Diagnostic, DiagnosticTarget, Severity } from '@sim/contracts';
 import { ruleDocOf } from '@sim/rule-engine';
 import { useActiveResult, useProjectStore } from '../store/useProjectStore';
+import { groupDiagnostics } from './diagGroups';
 
 const SEVERITY_TEXT: Record<Severity, string> = {
   error: '错误',
@@ -84,6 +85,79 @@ export const ValidationPanel = () => {
   const errorCount = (result?.diagnostics ?? []).filter((item) => item.severity === 'error').length;
   const warningCount = (result?.diagnostics ?? []).filter((item) => item.severity === 'warning').length;
   const passedCount = (result?.diagnostics ?? []).filter((item) => item.severity === 'info').length;
+
+  /**
+   * 按规则码分组（Q-T5）：同规则的多处命中（如 5 个 strapping 引脚）折叠为一行。
+   * 展开状态按规则码记忆 —— 重新校验后仍保持用户的展开偏好。
+   */
+  const groups = useMemo(() => groupDiagnostics(diagnostics), [diagnostics]);
+  const [expandedCodes, setExpandedCodes] = useState<Set<string>>(new Set());
+  const toggleGroup = (code: string) =>
+    setExpandedCodes((previous) => {
+      const next = new Set(previous);
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
+      return next;
+    });
+
+  /** 单条渲染（nested = 收起组内的条目，不再重复显示规则码与严重度） */
+  const renderDiagnostic = (item: Diagnostic, nested: boolean, index: number) => {
+    const doc = ruleDocOf(item.code);
+    return (
+      <div
+        className={`diag-item diag-${item.severity}${nested ? ' diag-item-nested' : ''}`}
+        key={`${item.code}-${index}`}
+      >
+        <div
+          className="diag-head"
+          onMouseEnter={() => setWhyCode(doc ? item.code : null)}
+          onMouseLeave={() => setWhyCode(null)}
+        >
+          {nested ? (
+            <span className="diag-index">#{index + 1}</span>
+          ) : (
+            <>
+              <span className="diag-code">{item.code}</span>
+              <span className="diag-severity">{SEVERITY_TEXT[item.severity]}</span>
+            </>
+          )}
+          <span className="diag-msg">{item.message}</span>
+          {/* 悬停/聚焦即显示说明（无需点击）；键盘用户可用 Tab 聚焦 */}
+          {doc ? (
+            <span
+              className="why-tip"
+              tabIndex={0}
+              title={`${item.code} · ${doc.title}`}
+              onFocus={() => setWhyCode(item.code)}
+              onBlur={() => setWhyCode(null)}
+            >
+              为什么
+            </span>
+          ) : null}
+        </div>
+        {item.suggestion ? <div className="diag-sug">建议：{item.suggestion}</div> : null}
+        <div className="diag-targets">
+          {item.targets.map((target) => (
+            <button
+              type="button"
+              className="target-chip"
+              key={`${target.type}-${target.id}`}
+              onClick={() => focus(target)}
+              title="在画布中定位"
+            >
+              {target.type === 'pin'
+                ? `引脚 ${target.id.replace('pin-esp32-', '').toUpperCase()}`
+                : target.type === 'instance'
+                  ? '组件'
+                  : target.type === 'port'
+                    ? `端口 ${target.portId ?? ''}`
+                    : '连线'}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className={`result-panel${collapsed ? ' result-collapsed' : ''}`}>
@@ -169,51 +243,30 @@ export const ValidationPanel = () => {
                 : '当前过滤条件下没有项目。'}
             </p>
           ) : (
-            diagnostics.map((item, index) => {
-              const doc = ruleDocOf(item.code);
+            groups.map((group) => {
+              // 单处命中：直接平铺，不引入多余点击
+              if (group.items.length === 1) return renderDiagnostic(group.items[0], false, 0);
+
+              const expanded = expandedCodes.has(group.code);
               return (
-                <div className={`diag-item diag-${item.severity}`} key={`${item.code}-${index}`}>
-                  <div
-                    className="diag-head"
-                    onMouseEnter={() => setWhyCode(doc ? item.code : null)}
+                <div className={`diag-group diag-${group.severity}`} key={group.code}>
+                  <button
+                    type="button"
+                    className="diag-group-head"
+                    onClick={() => toggleGroup(group.code)}
+                    onMouseEnter={() => setWhyCode(group.code)}
                     onMouseLeave={() => setWhyCode(null)}
+                    aria-expanded={expanded}
                   >
-                    <span className="diag-code">{item.code}</span>
-                    <span className="diag-severity">{SEVERITY_TEXT[item.severity]}</span>
-                    <span className="diag-msg">{item.message}</span>
-                    {/* 悬停/聚焦即显示说明（无需点击）；键盘用户可用 Tab 聚焦 */}
-                    {doc ? (
-                      <span
-                        className="why-tip"
-                        tabIndex={0}
-                        title={`${item.code} · ${doc.title}`}
-                        onFocus={() => setWhyCode(item.code)}
-                        onBlur={() => setWhyCode(null)}
-                      >
-                        为什么
-                      </span>
-                    ) : null}
-                  </div>
-                  {item.suggestion ? <div className="diag-sug">建议：{item.suggestion}</div> : null}
-                  <div className="diag-targets">
-                    {item.targets.map((target) => (
-                      <button
-                        type="button"
-                        className="target-chip"
-                        key={`${target.type}-${target.id}`}
-                        onClick={() => focus(target)}
-                        title="在画布中定位"
-                      >
-                        {target.type === 'pin'
-                          ? `引脚 ${target.id.replace('pin-esp32-', '').toUpperCase()}`
-                          : target.type === 'instance'
-                            ? '组件'
-                            : target.type === 'port'
-                              ? `端口 ${target.portId ?? ''}`
-                              : '连线'}
-                      </button>
-                    ))}
-                  </div>
+                    <span className="diag-code">{group.code}</span>
+                    <span className="diag-severity">{SEVERITY_TEXT[group.severity]}</span>
+                    <span className="diag-group-title">{group.title}</span>
+                    <span className="diag-group-count">{group.items.length} 处</span>
+                    <span className="diag-group-caret">{expanded ? '▾' : '▸'}</span>
+                  </button>
+                  {expanded
+                    ? group.items.map((item, index) => renderDiagnostic(item, true, index))
+                    : null}
                 </div>
               );
             })

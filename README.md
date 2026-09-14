@@ -124,10 +124,10 @@ npm run dev -w @sim/web           # http://127.0.0.1:5180
 
 | 层级 | 命令 | 现状 |
 | --- | --- | --- |
-| 规则引擎单测 | `npm test -w @sim/rule-engine` | 51 例（引脚真实性 + 20 条规则正反例 + 器件直连 + 教学说明完整性 + 可复现性） |
+| 规则引擎单测 | `npm test -w @sim/rule-engine` | 53 例（引脚真实性 + 20 条规则正反例 + 器件直连 + I2C 总线豁免 + 教学说明完整性 + 可复现性） |
 | 后端集成测试 | `npm test -w @sim/api` | 15 例（含 409 乐观锁冲突、数据隔离、导入导出往返、项目列表） |
-| 前端单测 | `npm test -w @sim/web` | 43 例（流程集成 + 引用稳定性 + 项目管理 + 撤销重做 + 器件直连 + 示例模板 + UI 冒烟） |
-| 真实浏览器冒烟 | `npm run smoke`（前后端需已启动） | 37 项断言（含真实拖拽创建器件直连、模板载入、窄屏顶栏），0 控制台错误 |
+| 前端单测 | `npm test -w @sim/web` | 49 例（流程集成 + 引用稳定性 + 项目管理 + 撤销重做 + 器件直连 + 示例模板 + 诊断分组 + UI 冒烟） |
+| 真实浏览器冒烟 | `npm run smoke`（前后端需已启动） | 40 项断言（含真实拖拽创建器件直连、模板载入、诊断分组折叠与展开），0 控制台错误 |
 | 主题可读性扫描 | `node apps/web/scripts/check-contrast.mjs dark\|light` | 低对比度文本 0 项 |
 | 性能基准 | `node apps/web/scripts/bench.mjs --web <生产预览地址>` | 帧率 5.6 ms/帧 · `/validate` p95 16.6 ms · 首屏 542 ms（详见 `docs/性能基准.md`） |
 | 全量 | `npm test && npm run typecheck && npm run build` | 109 例通过 / 0 error |

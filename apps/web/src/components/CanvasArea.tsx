@@ -19,8 +19,8 @@ import {
   type OnEdgesChange,
   type OnNodesChange,
 } from '@xyflow/react';
-import { useCallback, useEffect, useMemo } from 'react';
-import type { EndpointRef } from '@sim/contracts';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import type { ComponentInstance, EndpointRef } from '@sim/contracts';
 import { useDiagnosticIndex } from '../store/useDiagnostics';
 import {
   beginHistoryTransaction,
@@ -73,6 +73,22 @@ export const CanvasArea = () => {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [fitView]);
 
+  /**
+   * 节点 data 引用稳定化（M-04 基准优化）：
+   * 拖动时每帧都会重建 nodes 数组，若 data 每次都是新对象，节点组件的 memo 会失效、
+   * 全体节点跟着重渲染。这里按「内容是否变化」复用 data 对象，让 memo 真正生效。
+   */
+  const dataCacheRef = useRef(new Map<string, { slug: string; label: string }>());
+  const stableData = useCallback((instance: ComponentInstance) => {
+    const cached = dataCacheRef.current.get(instance.id);
+    if (cached && cached.slug === instance.definitionSlug && cached.label === instance.label) {
+      return cached;
+    }
+    const next = { slug: instance.definitionSlug, label: instance.label };
+    dataCacheRef.current.set(instance.id, next);
+    return next;
+  }, []);
+
   const nodes: Node[] = useMemo(
     () => [
       {
@@ -87,13 +103,13 @@ export const CanvasArea = () => {
         id: instance.id,
         type: 'component',
         position: instance.position,
-        data: { slug: instance.definitionSlug, label: instance.label },
+        data: stableData(instance),
         // 必须把选中状态写回受控节点：React Flow 的 deleteKeyCode 只会删除
         // 「内部认为已选中」的元素，否则按 Backspace/Delete 毫无反应
         selected: instance.id === selectedInstanceId,
       })),
     ],
-    [instances, selectedInstanceId],
+    [instances, selectedInstanceId, stableData],
   );
 
   const edges: Edge[] = useMemo(

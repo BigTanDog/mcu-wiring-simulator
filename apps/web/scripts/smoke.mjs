@@ -374,6 +374,20 @@ try {
   const templateNodes = await page.locator('.react-flow__node').count();
   check('载入模板后画布就绪（3 组件 + 开发板）', templateNodes === 4, `节点=${templateNodes}`);
 
+  // 多组件大项目模板（26 组件 / 59 连线）
+  await page.getByRole('button', { name: '项目管理' }).click();
+  await page.waitForSelector('.template-card', { timeout: 5000 });
+  await page.locator('.template-card', { hasText: '综合实验项目' }).click();
+  await page.waitForTimeout(900);
+  const labNodes = await page.locator('.react-flow__node').count();
+  const labEdges = await page.locator('.react-flow__edge').count();
+  check(
+    '综合实验项目模板可载入（26 组件 / 59 连线）',
+    labNodes >= 26 && labEdges >= 55,
+    `节点=${labNodes} 连线=${labEdges}`,
+  );
+  await page.screenshot({ path: `${OUT_DIR}/18-lab-project.png` });
+
   await page.getByRole('button', { name: /运行/ }).click();
   await page.waitForTimeout(1600);
   const templateStatus = await page.locator('.result-status').innerText();

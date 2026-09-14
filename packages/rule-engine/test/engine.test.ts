@@ -602,6 +602,32 @@ describe('第二批组件与 R-22（负载需驱动模块）', () => {
   });
 });
 
+describe('R-03 的 I2C 总线豁免（多设备共享 SDA/SCL）', () => {
+  it('OLED 与 LCD1602 共用同一 I2C 引脚 → 不报 R-03', () => {
+    const a = instance('c-oled', 'ssd1306-i2c', 'OLED-1', { address: '0x3C', pullup: true });
+    const b = instance('c-lcd', 'lcd1602-i2c', 'LCD1602-1', { address: '0x27', pullup: true });
+    const result = run([a, b], [
+      wire('pin-esp32-gpio21', 'c-oled', 'SDA'),
+      wire('pin-esp32-gpio22', 'c-oled', 'SCL'),
+      wire('pin-esp32-gpio21', 'c-lcd', 'SDA'),
+      wire('pin-esp32-gpio22', 'c-lcd', 'SCL'),
+    ]);
+    expect(codes(result)).not.toContain('R-03');
+  });
+
+  it('两个非总线器件接同一 GPIO → 仍然报 R-03', () => {
+    const led1 = instance('c-led1', 'led', 'LED-1', { seriesResistor: true });
+    const led2 = instance('c-led2', 'led', 'LED-2', { seriesResistor: true });
+    const result = run([led1, led2], [
+      wire('pin-esp32-gpio4', 'c-led1', 'A'),
+      wire('pin-esp32-gpio4', 'c-led2', 'A'),
+      wire('pin-esp32-gnd-1', 'c-led1', 'K'),
+      wire('pin-esp32-gnd-1', 'c-led2', 'K'),
+    ]);
+    expect(codes(result)).toContain('R-03');
+  });
+});
+
 describe('器件直连与独立电源（Q-T2 决策后新增）', () => {
   const driverWires = (driverId: string): Connection[] => [
     wire('pin-esp32-gpio25', driverId, 'ENA'),

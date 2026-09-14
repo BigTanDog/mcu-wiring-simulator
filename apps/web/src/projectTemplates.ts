@@ -135,7 +135,157 @@ export const PROJECT_TEMPLATES: ProjectTemplate[] = [
       wire('t4-e3', pin('pin-esp32-gnd-1'), port('t4-ttl', 'GND'), 'ground'),
     ],
   },
+  // 多组件大项目（放在数组末尾：模板卡片按顺序展示，常规教学模板在前）
+  buildLabProject(),
 ];
+
+/**
+ * 综合实验项目（多组件大项目）：把传感器 / 显示 / 执行器 / 交互元件接在同一块板上，
+ * 用于观察「多组件下」的画布表现与校验结果，也是性能基准（NFR-01）的人眼可读场景。
+ *
+ * 接线要点：
+ *  - LED 采用真实串联拓扑：`GPIO → 限流电阻 → LED 阳极`，`LED 阴极 → GND`（两处用到器件直连）；
+ *  - 舵机由 3.3V 电源模块独立供电（器件直连）并与开发板共地；
+ *  - 超声波 ECHO 已分压（5V → 3.3V，勾选豁免）；
+ *  - 按键统一使用芯片内部上拉；
+ *  - 电源/地引脚按"电源轨"语义共享（同一 GND 引脚可接多个 GND 端口）；
+ *  - 结果允许存在警告（strapping 引脚 / UART0 占用 / 超声波板载供电），但不得有 error —— 由单测强制。
+ */
+function buildLabProject(): ProjectTemplate {
+  const instances: ComponentInstance[] = [];
+  const connections: Connection[] = [];
+  let slot = 0;
+  let seq = 0;
+
+  const nextPosition = (): { x: number; y: number } => {
+    const position = { x: 620 + (slot % 4) * 320, y: 40 + Math.floor(slot / 4) * 170 };
+    slot += 1;
+    return position;
+  };
+
+  const add = (
+    id: string,
+    slug: string,
+    label: string,
+    portConfig: Record<string, string | boolean> = {},
+  ): void => {
+    instances.push({ id, definitionSlug: slug, label, position: nextPosition(), portConfig });
+  };
+
+  const pin = (pinId: string): Connection['from'] => ({ type: 'pin', pinId });
+  const port = (instanceId: string, portId: string): Connection['to'] => ({
+    type: 'port',
+    instanceId,
+    portId,
+  });
+  const w = (from: Connection['from'], to: Connection['to'], kind: Connection['kind']): void => {
+    seq += 1;
+    connections.push({ id: `t5-e${seq}`, from, to, kind, enabled: true });
+  };
+
+  /* ------------------------------ 元件 ------------------------------ */
+  add('t5-dht11', 'dht11', 'DHT11-1', { pullup: true });
+  add('t5-sr04', 'hc-sr04', 'HC-SR04-1', { levelShifted: true, externalSupply: false });
+  add('t5-servo', 'servo-sg90', 'SG90-1', { externalSupply: false });
+  add('t5-buzzer', 'buzzer-active', '蜂鸣器-1', { triggerLevel: '高电平触发' });
+  add('t5-l298', 'l298n', 'L298N-1', { externalSupply: true });
+  add('t5-motor', 'dc-motor', '电机-1', { externalSupply: true });
+  add('t5-power', 'power-3v3', '电源模块-1');
+  add('t5-oled', 'ssd1306-i2c', 'OLED-1', { address: '0x3C', pullup: true });
+  add('t5-lcd', 'lcd1602-i2c', 'LCD1602-1', { address: '0x27', pullup: true });
+
+  const keyPins = ['pin-esp32-gpio18', 'pin-esp32-gpio19', 'pin-esp32-gpio23', 'pin-esp32-gpio25'];
+  keyPins.forEach((_, index) => {
+    add(`t5-key${index + 1}`, 'push-button', `KEY-${index + 1}`, { internalPullup: true });
+  });
+
+  const ledPins = [
+    'pin-esp32-gpio4',
+    'pin-esp32-gpio5',
+    'pin-esp32-gpio13',
+    'pin-esp32-gpio14',
+    'pin-esp32-gpio15',
+    'pin-esp32-gpio12',
+  ];
+  ledPins.forEach((_, index) => {
+    add(`t5-r${index + 1}`, 'resistor', `R-${index + 1}`, { resistance: '220Ω' });
+    add(`t5-led${index + 1}`, 'led', `LED-${index + 1}`, { seriesResistor: false });
+  });
+
+  add('t5-ttl', 'usb-ttl', 'USB-TTL-1', { voltage: '3V3' });
+
+  /* ------------------------------ 连线 ------------------------------ */
+  // DHT11（单总线）
+  w(pin('pin-esp32-3v3'), port('t5-dht11', 'VCC'), 'power');
+  w(pin('pin-esp32-gpio26'), port('t5-dht11', 'DATA'), 'signal');
+  w(pin('pin-esp32-gnd-1'), port('t5-dht11', 'GND'), 'ground');
+
+  // 超声波（ECHO 已分压）
+  w(pin('pin-esp32-5v'), port('t5-sr04', 'VCC'), 'power');
+  w(pin('pin-esp32-gpio16'), port('t5-sr04', 'TRIG'), 'signal');
+  w(pin('pin-esp32-gpio17'), port('t5-sr04', 'ECHO'), 'signal');
+  w(pin('pin-esp32-gnd-1'), port('t5-sr04', 'GND'), 'ground');
+
+  // 舵机：电源模块独立供电（器件直连）+ 共地
+  w(pin('pin-esp32-gpio32'), port('t5-servo', 'SIG'), 'signal');
+  w(pin('pin-esp32-gnd-2'), port('t5-servo', 'GND'), 'ground');
+  w(port('t5-power', 'OUT'), port('t5-servo', 'VCC'), 'power');
+  w(pin('pin-esp32-gnd-2'), port('t5-power', 'GND'), 'ground');
+
+  // 蜂鸣器
+  w(pin('pin-esp32-3v3'), port('t5-buzzer', 'VCC'), 'power');
+  w(pin('pin-esp32-gpio27'), port('t5-buzzer', 'IO'), 'signal');
+  w(pin('pin-esp32-gnd-1'), port('t5-buzzer', 'GND'), 'ground');
+
+  // L298N + 直流电机（输出侧器件直连）
+  w(pin('pin-esp32-gpio2'), port('t5-l298', 'ENA'), 'signal');
+  w(pin('pin-esp32-gpio33'), port('t5-l298', 'IN1'), 'signal');
+  w(pin('pin-esp32-gpio0'), port('t5-l298', 'IN2'), 'signal');
+  w(pin('pin-esp32-gnd-2'), port('t5-l298', 'GND'), 'ground');
+  w(pin('pin-esp32-5v'), port('t5-l298', '+12V'), 'power');
+  w(port('t5-l298', 'OUT1'), port('t5-motor', '+'), 'power');
+  w(port('t5-l298', 'OUT2'), port('t5-motor', '-'), 'power');
+
+  // I2C 显示：OLED 与 LCD1602 共用总线（地址不同）
+  w(pin('pin-esp32-3v3'), port('t5-oled', 'VCC'), 'power');
+  w(pin('pin-esp32-gpio22'), port('t5-oled', 'SCL'), 'bus');
+  w(pin('pin-esp32-gpio21'), port('t5-oled', 'SDA'), 'bus');
+  w(pin('pin-esp32-gnd-1'), port('t5-oled', 'GND'), 'ground');
+
+  w(pin('pin-esp32-5v'), port('t5-lcd', 'VCC'), 'power');
+  w(pin('pin-esp32-gpio22'), port('t5-lcd', 'SCL'), 'bus');
+  w(pin('pin-esp32-gpio21'), port('t5-lcd', 'SDA'), 'bus');
+  w(pin('pin-esp32-gnd-1'), port('t5-lcd', 'GND'), 'ground');
+
+  // 按键（内部上拉）
+  keyPins.forEach((pinId, index) => {
+    w(pin(pinId), port(`t5-key${index + 1}`, 'P1'), 'signal');
+    w(pin('pin-esp32-gnd-2'), port(`t5-key${index + 1}`, 'P2'), 'ground');
+  });
+
+  // LED 支路：GPIO → 限流电阻 → LED 阳极，阴极 → GND
+  ledPins.forEach((pinId, index) => {
+    w(pin(pinId), port(`t5-r${index + 1}`, '1'), 'signal');
+    w(port(`t5-r${index + 1}`, '2'), port(`t5-led${index + 1}`, 'A'), 'signal');
+    w(pin('pin-esp32-gnd-2'), port(`t5-led${index + 1}`, 'K'), 'ground');
+  });
+
+  // USB-TTL（TX/RX 交叉）
+  w(pin('pin-esp32-gpio3'), port('t5-ttl', 'TX'), 'signal');
+  w(pin('pin-esp32-gpio1'), port('t5-ttl', 'RX'), 'signal');
+  w(pin('pin-esp32-gnd-1'), port('t5-ttl', 'GND'), 'ground');
+
+  return {
+    id: 'lab-showcase',
+    name: '综合实验项目',
+    summary: `把 ${instances.length} 个元件接在同一块板上（传感器 / 显示 / 执行器 / 交互），用于观察多组件下的画布表现与校验结果。`,
+    highlights: [`${instances.length} 组件 / ${connections.length} 连线`, '器件直连', 'I2C 双设备'],
+    projectName: `示例：综合实验项目（${instances.length} 组件）`,
+    options: { wifiEnabled: false, mode: 'loose' },
+    instances,
+    connections,
+  };
+}
 
 /** 默认模板（顶栏「载入示例」按钮使用） */
 export const SAMPLE_TEMPLATE_ID = 'dht11-oled';

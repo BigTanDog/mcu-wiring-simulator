@@ -3,6 +3,7 @@
  * 端口按角色着色，校验后按诊断严重度高亮；端口标签在悬停/选中时展开。
  */
 import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { memo } from 'react';
 import { getComponentDef } from '@sim/definitions';
 import type { PortDef } from '@sim/contracts';
 import { useDiagnosticIndex } from '../../store/useDiagnostics';
@@ -20,7 +21,11 @@ const portColor = (port: PortDef): string => {
   return 'var(--cap-gpio)';
 };
 
-export const ComponentNode = (props: NodeProps) => {
+/**
+ * 用 memo 包裹：拖动节点/画布时避免"全体节点重渲染"（M-04 基准优化）。
+ * 数据更新仍通过 store 订阅生效（实例内容或诊断变化时正常刷新）。
+ */
+export const ComponentNode = memo(function ComponentNode(props: NodeProps) {
   const data = props.data as unknown as ComponentNodeData;
   const def = getComponentDef(data.slug);
   const index = useDiagnosticIndex();
@@ -86,4 +91,4 @@ export const ComponentNode = (props: NodeProps) => {
       </div>
     </div>
   );
-};
+});

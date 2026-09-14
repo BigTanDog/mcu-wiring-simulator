@@ -36,9 +36,9 @@ describe('示例项目模板', () => {
       });
       const errors = result.diagnostics.filter((item) => item.severity === 'error');
       expect(
-        errors.map((item) => `${item.code}:${item.message}`),
+        errors.map((item) => `${item.code}: ${item.message}`).join('\n'),
         `模板「${template.name}」存在 error`,
-      ).toEqual([]);
+      ).toBe('');
     }
   });
 

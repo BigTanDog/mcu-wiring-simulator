@@ -4,6 +4,7 @@
  * 校验后按诊断严重度高亮。
  */
 import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { memo } from 'react';
 import { ESP32_DEVKITC_V4 } from '@sim/definitions';
 import type { PinDef } from '@sim/contracts';
 import { useDiagnosticIndex } from '../../store/useDiagnostics';
@@ -40,7 +41,8 @@ const capLabel = (pin: PinDef): string => {
   return labels.join(' · ');
 };
 
-export const BoardNode = (props: NodeProps) => {
+/** 用 memo 包裹：开发板节点含 38 个引脚，避免无谓重渲染（M-04 基准优化） */
+export const BoardNode = memo(function BoardNode(props: NodeProps) {
   const index = useDiagnosticIndex();
   const leftPins = ESP32_DEVKITC_V4.pins.filter((pin) => pin.side === 'left');
   const rightPins = ESP32_DEVKITC_V4.pins.filter((pin) => pin.side === 'right');
@@ -136,4 +138,4 @@ export const BoardNode = (props: NodeProps) => {
       </div>
     </div>
   );
-};
+});

@@ -198,6 +198,19 @@ const R03_PIN_MULTIPLE_USE: Rule = {
 
     for (const [pinId, users] of pinUsage) {
       if (users.length < 2) continue;
+
+      /**
+       * I2C 是多设备共享总线：同一条 SDA/SCL 上挂多个 I2C 从设备是**正确接法**
+       * （地址冲突由 R-13 负责）。此处放行"参与共享的端口全部声明 I2C 协议"的情况。
+       */
+      const allI2cDevices = users.every((user) => {
+        const instance = instances.find((item) => item.id === user.instanceId);
+        const def = instance ? defs.get(instance.definitionSlug) : undefined;
+        const port = def ? portOf(def, user.portId) : undefined;
+        return (port?.protocols ?? []).includes('I2C');
+      });
+      if (allI2cDevices) continue;
+
       const names = users.map((user) => {
         const instance = instances.find((item) => item.id === user.instanceId);
         const def = instance ? defs.get(instance.definitionSlug) : undefined;
@@ -212,7 +225,8 @@ const R03_PIN_MULTIPLE_USE: Rule = {
         message: sameInstance
           ? `${pinLabel}：${names.join(' 与 ')} 被短接在同一个引脚上`
           : `${pinLabel} 被多个器件占用：${names.join(' / ')}`,
-        suggestion: '一个 GPIO 只接一路信号；共享总线（I2C）应是一对多，而不是多个器件硬接同一输出脚。',
+        suggestion:
+          '一个 GPIO 通常只接一路信号（I2C 总线是例外：多个从设备可共享 SDA/SCL，本规则会自动放行）。请给每个器件分配独立引脚，或改用总线连接。',
         targets: [pinTarget(pinId), ...users.map((user) => portTarget(user.instanceId, user.portId))],
       });
     }

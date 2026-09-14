@@ -50,7 +50,7 @@ describe('项目流程（store 集成）', () => {
 
   it('取消 OLED 上拉：出现 R-12 警告，状态为 warning', async () => {
     useProjectStore.getState().loadSampleProject();
-    useProjectStore.getState().setPortConfig('c-oled', 'pullup', false);
+    useProjectStore.getState().setPortConfig('t1-oled', 'pullup', false);
 
     await useProjectStore.getState().runValidation();
 
@@ -142,12 +142,12 @@ describe('项目流程（store 集成）', () => {
   it('删除组件时级联删除其连线', () => {
     useProjectStore.getState().loadSampleProject();
     const before = useProjectStore.getState().connections.length;
-    useProjectStore.getState().removeInstance('c-oled');
+    useProjectStore.getState().removeInstance('t1-oled');
     const after = useProjectStore.getState().connections;
     expect(after.length).toBeLessThan(before);
     expect(
       after.some(
-        (conn) => conn.from.type === 'port' && conn.from.instanceId === 'c-oled',
+        (conn) => conn.from.type === 'port' && conn.from.instanceId === 't1-oled',
       ),
     ).toBe(false);
   });

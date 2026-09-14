@@ -50,7 +50,7 @@ export const TopBar = () => {
     <header className="topbar">
       <div className="brand">
         <span className="brand-mark">2D</span>
-        <div>
+        <div className="brand-text">
           <div className="brand-title">单片机接线仿真与校验平台</div>
           <div className="brand-sub">前后端分离 · 定义与校验由后端服务提供</div>
         </div>
@@ -116,37 +116,63 @@ export const TopBar = () => {
         className="btn"
         onClick={() => setShortcutsOpen(true)}
         title="查看快捷键与操作技巧（也可按 Esc 关闭）"
+        aria-label="快捷键"
       >
-        ⌨ 快捷键
+        <span className="btn-label-full">⌨ 快捷键</span>
+        <span className="btn-label-short">⌨</span>
       </button>
 
       <button
         type="button"
         className="btn"
         onClick={() => setProjectPanelOpen(true)}
-        title="新建 / 打开 / 保存服务端项目"
+        title="新建 / 打开 / 保存服务端项目 / 载入示例模板"
+        aria-label="项目管理"
       >
-        项目…
+        <span className="btn-label-full">项目…</span>
+        <span className="btn-label-short">项目</span>
       </button>
       <button
         type="button"
         className="btn"
         onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
         title="切换明暗主题"
+        aria-label="切换主题"
       >
         {theme === 'light' ? '深色' : '浅色'}
       </button>
-      <button type="button" className="btn" onClick={loadSampleProject}>
-        载入示例
+      <button
+        type="button"
+        className="btn"
+        onClick={loadSampleProject}
+        aria-label="载入示例"
+        title="载入示例模板（温湿度显示）"
+      >
+        <span className="btn-label-full">载入示例</span>
+        <span className="btn-label-short">示例</span>
       </button>
-      <button type="button" className="btn" onClick={clearProject}>
-        清空画布
+      <button
+        type="button"
+        className="btn"
+        onClick={clearProject}
+        aria-label="清空画布"
+        title="清空画布上的所有元件与连线"
+      >
+        <span className="btn-label-full">清空画布</span>
+        <span className="btn-label-short">清空</span>
       </button>
-      <button type="button" className="btn" onClick={onExport}>
-        导出 JSON
+      <button type="button" className="btn" onClick={onExport} aria-label="导出 JSON">
+        <span className="btn-label-full">导出 JSON</span>
+        <span className="btn-label-short">导出</span>
       </button>
-      <button type="button" className="btn" onClick={() => fileRef.current?.click()}>
-        导入 JSON
+      <button
+        type="button"
+        className="btn"
+        onClick={() => fileRef.current?.click()}
+        aria-label="导入 JSON"
+      >
+        <span className="btn-label-full">导入 JSON</span>
+        <span className="btn-label-short">导入</span>
       </button>
       <input
         ref={fileRef}

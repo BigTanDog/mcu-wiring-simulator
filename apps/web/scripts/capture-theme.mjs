@@ -23,7 +23,7 @@ try {
 
   // 载入示例项目，让图上内容更完整
   await page.getByRole('button', { name: /载入示例/ }).click();
-  await page.waitForSelector('[data-testid="component-c-oled"]', { timeout: 8000 });
+  await page.waitForSelector('[data-testid="component-t1-oled"]', { timeout: 8000 });
   await page.waitForTimeout(800);
 
   // 默认（亮色，已降亮度）

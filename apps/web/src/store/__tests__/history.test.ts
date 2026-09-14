@@ -49,12 +49,12 @@ describe('撤销 / 重做（FR-15）', () => {
     const connectionsBefore = state().connections.length;
     expect(connectionsBefore).toBeGreaterThan(0);
 
-    state().removeInstance('c-dht11');
-    expect(state().instances.some((item) => item.id === 'c-dht11')).toBe(false);
+    state().removeInstance('t1-dht11');
+    expect(state().instances.some((item) => item.id === 't1-dht11')).toBe(false);
     expect(state().connections.length).toBeLessThan(connectionsBefore);
 
     state().undo();
-    expect(state().instances.some((item) => item.id === 'c-dht11')).toBe(true);
+    expect(state().instances.some((item) => item.id === 't1-dht11')).toBe(true);
     expect(state().connections).toHaveLength(connectionsBefore);
   });
 
@@ -71,11 +71,11 @@ describe('撤销 / 重做（FR-15）', () => {
 
   it('端口配置修改可撤销', () => {
     state().loadSampleProject();
-    state().setPortConfig('c-oled', 'address', '0x3D');
-    expect(state().instances.find((item) => item.id === 'c-oled')?.portConfig.address).toBe('0x3D');
+    state().setPortConfig('t1-oled', 'address', '0x3D');
+    expect(state().instances.find((item) => item.id === 't1-oled')?.portConfig.address).toBe('0x3D');
 
     state().undo();
-    expect(state().instances.find((item) => item.id === 'c-oled')?.portConfig.address).toBe('0x3C');
+    expect(state().instances.find((item) => item.id === 't1-oled')?.portConfig.address).toBe('0x3C');
   });
 
   it('拖动（事务）期间的多次位置更新只记为一步', () => {

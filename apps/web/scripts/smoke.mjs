@@ -66,8 +66,8 @@ try {
 
   // 2. 载入示例项目
   await page.getByRole('button', { name: /载入示例/ }).click();
-  await page.waitForSelector('[data-testid="component-c-oled"]', { timeout: 5000 });
-  await page.waitForSelector('[data-testid="component-c-dht11"]');
+  await page.waitForSelector('[data-testid="component-t1-oled"]', { timeout: 5000 });
+  await page.waitForSelector('[data-testid="component-t1-dht11"]');
   const edgeCount = await page.locator('.react-flow__edge').count();
   check('示例项目生成 7 条连线', edgeCount === 7, `实际 ${edgeCount}`);
   await page.screenshot({ path: `${OUT_DIR}/02-sample.png` });
@@ -89,7 +89,7 @@ try {
     store.getState().removeConnection('e-s2');
     store.getState().addConnection(
       { type: 'pin', pinId: 'pin-esp32-gpio34' },
-      { type: 'port', instanceId: 'c-dht11', portId: 'DATA' },
+      { type: 'port', instanceId: 't1-dht11', portId: 'DATA' },
     );
   });
   await page.getByRole('button', { name: /运行/ }).click();
@@ -361,6 +361,41 @@ try {
     `诊断：${directCodes.map((code, idx) => `${code}:${(directMsgs[idx] ?? '').slice(0, 28)}`).join(' | ')}`,
   );
   await page.screenshot({ path: `${OUT_DIR}/14-direct-connection.png` });
+
+  // 15. 示例模板：项目管理面板里载入「电机调速」（含器件直连）
+  await page.getByRole('button', { name: '项目管理' }).click();
+  await page.waitForSelector('.project-modal', { timeout: 5000 });
+  const templateCount = await page.locator('.template-card').count();
+  check('项目管理显示示例模板', templateCount >= 4, `${templateCount} 个`);
+  await page.screenshot({ path: `${OUT_DIR}/15-templates.png` });
+
+  await page.locator('.template-card', { hasText: '电机调速' }).click();
+  await page.waitForTimeout(700);
+  const templateNodes = await page.locator('.react-flow__node').count();
+  check('载入模板后画布就绪（3 组件 + 开发板）', templateNodes === 4, `节点=${templateNodes}`);
+
+  await page.getByRole('button', { name: /运行/ }).click();
+  await page.waitForTimeout(1600);
+  const templateStatus = await page.locator('.result-status').innerText();
+  check(
+    '电机调速模板可运行且无 error',
+    /校验通过|存在警告/.test(templateStatus),
+    templateStatus,
+  );
+  await page.screenshot({ path: `${OUT_DIR}/16-template-motor.png` });
+
+  // 16. 窄窗口下顶栏保持单行（按钮文字不被压成竖排）
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await page.waitForTimeout(700);
+  const barBox = await page.locator('.topbar').boundingBox();
+  const sampleBtnBox = await page.getByRole('button', { name: '载入示例' }).boundingBox();
+  check(
+    '窄窗口下顶栏不换行（按钮高度正常）',
+    !!barBox && barBox.height <= 64 && !!sampleBtnBox && sampleBtnBox.height <= 40,
+    `topbar=${barBox ? Math.round(barBox.height) : 'n/a'}px 按钮=${sampleBtnBox ? Math.round(sampleBtnBox.height) : 'n/a'}px`,
+  );
+  await page.screenshot({ path: `${OUT_DIR}/17-topbar-narrow.png` });
+  await page.setViewportSize({ width: 1500, height: 940 });
 } catch (error) {
   check('执行过程无异常', false, error instanceof Error ? error.message : String(error));
 } finally {

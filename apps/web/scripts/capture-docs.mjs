@@ -29,7 +29,7 @@ try {
 
   // 2. 载入示例项目
   await page.getByRole('button', { name: /载入示例/ }).click();
-  await page.waitForSelector('[data-testid="component-c-oled"]', { timeout: 8000 });
+  await page.waitForSelector('[data-testid="component-t1-oled"]', { timeout: 8000 });
   await page.waitForTimeout(600);
   await page.screenshot({ path: `${OUT_DIR}/ui-02-sample-project.png` });
 
@@ -45,7 +45,7 @@ try {
     store.getState().removeConnection('e-s2');
     store.getState().addConnection(
       { type: 'pin', pinId: 'pin-esp32-gpio34' },
-      { type: 'port', instanceId: 'c-dht11', portId: 'DATA' },
+      { type: 'port', instanceId: 't1-dht11', portId: 'DATA' },
     );
   });
   await page.getByRole('button', { name: /运行/ }).click();

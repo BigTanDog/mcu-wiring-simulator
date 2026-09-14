@@ -11,6 +11,7 @@ import { persist } from 'zustand/middleware';
 import { apiClient } from '../api/client';
 import { ApiHttpError } from '../api/httpClient';
 import { setSimulatedOffline } from '../api/mockApi';
+import { SAMPLE_TEMPLATE_ID, findTemplate } from '../projectTemplates';
 import { COMPONENTS, getBoard, getComponentDef } from '@sim/definitions';
 import type {
   ComponentInstance,
@@ -175,6 +176,9 @@ interface ProjectState {
   selectConnection: (id: string | null) => void;
   setOptions: (patch: Partial<ProjectOptions>) => void;
   runValidation: () => Promise<void>;
+  /** 载入示例项目模板（见 src/projectTemplates.ts） */
+  loadTemplate: (templateId: string) => void;
+  /** 载入默认示例模板（顶栏按钮） */
   loadSampleProject: () => void;
   clearProject: () => void;
   exportJson: () => string;
@@ -602,85 +606,37 @@ export const useProjectStore = create<ProjectState>()(
         }
       },
 
-      loadSampleProject: () => {
-        const instances: ComponentInstance[] = [
-          {
-            id: 'c-dht11',
-            definitionSlug: 'dht11',
-            label: 'DHT11-1',
-            position: { x: 460, y: 120 },
-            portConfig: { pullup: true },
-          },
-          {
-            id: 'c-oled',
-            definitionSlug: 'ssd1306-i2c',
-            label: 'OLED-1',
-            position: { x: 460, y: 340 },
-            portConfig: { address: '0x3C', pullup: true },
-          },
-        ];
-        const connections: Connection[] = [
-          {
-            id: 'e-s1',
-            from: { type: 'pin', pinId: 'pin-esp32-3v3' },
-            to: { type: 'port', instanceId: 'c-dht11', portId: 'VCC' },
-            kind: 'power',
-            enabled: true,
-          },
-          {
-            id: 'e-s2',
-            from: { type: 'pin', pinId: 'pin-esp32-gpio4' },
-            to: { type: 'port', instanceId: 'c-dht11', portId: 'DATA' },
-            kind: 'signal',
-            enabled: true,
-          },
-          {
-            id: 'e-s3',
-            from: { type: 'pin', pinId: 'pin-esp32-gnd-1' },
-            to: { type: 'port', instanceId: 'c-dht11', portId: 'GND' },
-            kind: 'ground',
-            enabled: true,
-          },
-          {
-            id: 'e-s4',
-            from: { type: 'pin', pinId: 'pin-esp32-3v3' },
-            to: { type: 'port', instanceId: 'c-oled', portId: 'VCC' },
-            kind: 'power',
-            enabled: true,
-          },
-          {
-            id: 'e-s5',
-            from: { type: 'pin', pinId: 'pin-esp32-gpio22' },
-            to: { type: 'port', instanceId: 'c-oled', portId: 'SCL' },
-            kind: 'bus',
-            enabled: true,
-          },
-          {
-            id: 'e-s6',
-            from: { type: 'pin', pinId: 'pin-esp32-gpio21' },
-            to: { type: 'port', instanceId: 'c-oled', portId: 'SDA' },
-            kind: 'bus',
-            enabled: true,
-          },
-          {
-            id: 'e-s7',
-            from: { type: 'pin', pinId: 'pin-esp32-gnd-2' },
-            to: { type: 'port', instanceId: 'c-oled', portId: 'GND' },
-            kind: 'ground',
-            enabled: true,
-          },
-        ];
+      loadTemplate: (templateId) => {
+        const template = findTemplate(templateId);
+        if (!template) {
+          get().showToast(`未找到示例模板：${templateId}`, 'warn');
+          return;
+        }
+        // 深拷贝模板数据：用户随后编辑画布不会污染模板本身
         set({
-          projectName: '示例：ESP32 + DHT11 + OLED',
-          instances,
-          connections,
+          projectName: template.projectName,
+          instances: template.instances.map((item) => ({
+            ...item,
+            position: { ...item.position },
+            portConfig: { ...item.portConfig },
+          })),
+          connections: template.connections.map((conn) => ({ ...conn })),
+          options: {
+            ...get().options,
+            wifiEnabled: template.options.wifiEnabled,
+            mode: template.options.mode,
+          },
           localResult: null,
           serverResult: null,
           hasRun: false,
           selectedInstanceId: null,
           selectedConnectionId: null,
         });
-        get().showToast('已载入示例项目：点击右上角「运行」查看校验结果');
+        get().showToast(`已载入「${template.name}」模板：点击右上角「运行」查看校验结果`);
+      },
+
+      loadSampleProject: () => {
+        get().loadTemplate(SAMPLE_TEMPLATE_ID);
       },
 
       clearProject: () => {

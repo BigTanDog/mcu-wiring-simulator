@@ -142,6 +142,59 @@ button {
   background: var(--panel);
   border-bottom: 1px solid var(--border);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  /* 窄窗口下整条横向滚动、绝不换行 —— 否则按钮文字会被压成竖排（曾经的问题） */
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.topbar::-webkit-scrollbar {
+  display: none;
+}
+
+.topbar .btn,
+.topbar .chip,
+.topbar .run-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.topbar .project-name {
+  flex: 0 1 150px;
+  min-width: 84px;
+}
+
+/* 双文本按钮：默认完整文案，窄屏切换为短文案（避免挤压变形） */
+.btn-label-short {
+  display: none;
+}
+
+@media (max-width: 1460px) {
+  .topbar {
+    gap: 6px;
+  }
+
+  .btn-label-full {
+    display: none;
+  }
+
+  .btn-label-short {
+    display: inline;
+  }
+}
+
+@media (max-width: 1240px) {
+  .brand-sub,
+  .topbar .chip-muted {
+    display: none;
+  }
+}
+
+@media (max-width: 1024px) {
+  .brand-text {
+    display: none;
+  }
 }
 
 .brand {
@@ -1409,6 +1462,77 @@ button {
 .modal-head h2 {
   margin: 0;
   font-size: 15px;
+}
+
+/* ---------------------------- 示例模板区 ---------------------------- */
+
+.project-templates {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modal-subtitle {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+  gap: 8px;
+}
+
+.template-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-soft);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.08s;
+}
+
+.template-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 4px 14px rgba(47, 111, 237, 0.12);
+}
+
+.template-card:active {
+  transform: scale(0.995);
+}
+
+.template-name {
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.template-summary {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.template-highlights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.template-highlights em {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--chip-bg);
+  color: var(--chip-fg);
+  font-style: normal;
+  font-size: 10px;
 }
 
 /* ---------------------------- 快捷键说明面板 ---------------------------- */

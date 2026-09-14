@@ -6,6 +6,7 @@
  * 说明：本地草稿仍由 localStorage 自动保存，未绑定服务端时不影响使用。
  */
 import { useState } from 'react';
+import { PROJECT_TEMPLATES } from '../projectTemplates';
 import { useProjectStore } from '../store/useProjectStore';
 
 const SAVE_LABEL: Record<string, string> = {
@@ -30,6 +31,7 @@ export const ProjectPanel = () => {
   const openProjectById = useProjectStore((state) => state.openProjectById);
   const saveProjectToServer = useProjectStore((state) => state.saveProjectToServer);
   const deleteProjectById = useProjectStore((state) => state.deleteProjectById);
+  const loadTemplate = useProjectStore((state) => state.loadTemplate);
   const [newName, setNewName] = useState('');
 
   if (!open) return null;
@@ -71,6 +73,33 @@ export const ProjectPanel = () => {
                 覆盖保存
               </button>
             ) : null}
+          </div>
+        </section>
+
+        {/* 示例模板：用现有组件预置的正确接线，一键载入后可直接运行并与自己的接法对比 */}
+        <section className="project-templates">
+          <h3 className="modal-subtitle">示例模板（预置的正确接线，载入后可运行查看结论）</h3>
+          <div className="template-grid">
+            {PROJECT_TEMPLATES.map((template) => (
+              <button
+                type="button"
+                className="template-card"
+                key={template.id}
+                onClick={() => {
+                  loadTemplate(template.id);
+                  setOpen(false);
+                }}
+                title={`载入模板：${template.name}`}
+              >
+                <span className="template-name">{template.name}</span>
+                <span className="template-summary">{template.summary}</span>
+                <span className="template-highlights">
+                  {template.highlights.map((item) => (
+                    <em key={item}>{item}</em>
+                  ))}
+                </span>
+              </button>
+            ))}
           </div>
         </section>
 

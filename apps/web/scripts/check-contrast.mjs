@@ -36,7 +36,7 @@ try {
 
   // 覆盖尽量多的界面状态，避免漏检
   await page.getByRole('button', { name: /载入示例/ }).click();
-  await page.waitForSelector('[data-testid="component-c-oled"]', { timeout: 8000 });
+  await page.waitForSelector('[data-testid="component-t1-oled"]', { timeout: 8000 });
   await page.getByRole('button', { name: /运行/ }).click();
   await page.getByText('校验通过').waitFor({ timeout: 10000 });
   await page.waitForTimeout(800);

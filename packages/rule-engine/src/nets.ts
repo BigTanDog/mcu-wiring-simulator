@@ -106,11 +106,20 @@ export const netOfPort = (
   );
 
 /** net 中是否存在无源元件（电阻/电容等）——用于"已接上拉/限流电阻"的判定 */
+/**
+ * 元件是否为"两端无源元件"（电阻 / 电容 / 二极管等）：端口数 ≤ 2 且全部为 passive 角色。
+ *
+ * 不能用"该 net 上存在 passive 端口"来判定 —— 面包板这类接线载体的列端口也是 passive，
+ * 会导致 LED 接上面包板后不再报"缺少限流电阻"（漏报，比误报更危险）。
+ */
+export const isPassiveElement = (def: ComponentDef): boolean =>
+  def.ports.length <= 2 && def.ports.every((port) => port.role === 'passive');
+
 export const hasPassiveComponent = (net: Net | undefined, excludeInstanceId?: string): boolean => {
   if (!net) return false;
   return net.ports.some((item) => {
     if (item.instance.id === excludeInstanceId) return false;
-    return item.def.ports.some((port) => port.id === item.portId && port.role === 'passive');
+    return isPassiveElement(item.def);
   });
 };
 

@@ -166,6 +166,7 @@ try {
   const libText = await page.locator('.sidebar').innerText();
   const expectedLib = [
     '通信模块',
+    '面包板（半尺寸 12 列）',
     'HC-SR04 超声波测距',
     'SG90 舵机',
     '有源蜂鸣器模块',
@@ -412,6 +413,27 @@ try {
     `展开后明细=${nestedAfterExpand}`,
   );
   await page.screenshot({ path: `${OUT_DIR}/19-diag-group.png` });
+
+  // 面包板（简化模型）：孔位网格节点 + 一拖多模板
+  await page.getByRole('button', { name: '项目管理' }).click();
+  await page.waitForSelector('.template-card', { timeout: 5000 });
+  await page.locator('.template-card', { hasText: '面包板一拖多' }).click();
+  await page.waitForTimeout(900);
+  const bbNodes = await page.locator('.breadboard-node').count();
+  const bbCols = await page.locator('.bb-col').count();
+  check(
+    '面包板模板载入并渲染孔位网格（12 列 + 2 条电源轨）',
+    bbNodes === 1 && bbCols === 12,
+    `面包板=${bbNodes} 列=${bbCols}`,
+  );
+  await page.getByRole('button', { name: /运行/ }).click();
+  await page.waitForFunction(() => !!document.querySelector('.result-status'), undefined, {
+    timeout: 15000,
+  });
+  await page.waitForTimeout(300);
+  const bbStatus = await page.locator('.result-status').innerText();
+  check('面包板一拖多模板校验无错误', !/存在错误/.test(bbStatus), bbStatus);
+  await page.screenshot({ path: `${OUT_DIR}/20-breadboard.png` });
 
   await page.getByRole('button', { name: /运行/ }).click();
   await page.waitForTimeout(1600);

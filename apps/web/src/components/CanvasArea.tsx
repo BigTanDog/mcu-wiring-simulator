@@ -21,7 +21,9 @@ import {
 } from '@xyflow/react';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { ComponentInstance, EndpointRef } from '@sim/contracts';
+import { findComponentDef } from '@sim/definitions';
 import { useDiagnosticIndex } from '../store/useDiagnostics';
+import { BreadboardNode } from './nodes/BreadboardNode';
 import {
   beginHistoryTransaction,
   endHistoryTransaction,
@@ -33,7 +35,11 @@ import { BoardNode } from './nodes/BoardNode';
 import { ComponentNode } from './nodes/ComponentNode';
 import { ValidationPanel } from './ValidationPanel';
 
-const nodeTypes = { board: BoardNode, component: ComponentNode };
+const nodeTypes = {
+  board: BoardNode,
+  component: ComponentNode,
+  breadboard: BreadboardNode,
+};
 
 const nodeIdOf = (ref: EndpointRef): string => (ref.type === 'pin' ? 'board' : ref.instanceId);
 
@@ -101,7 +107,11 @@ export const CanvasArea = () => {
       },
       ...instances.map((instance) => ({
         id: instance.id,
-        type: 'component',
+        // 渲染形态由定义声明（面包板用孔位网格节点，其余用标准组件节点）
+        type:
+          findComponentDef(instance.definitionSlug)?.renderAs === 'breadboard'
+            ? 'breadboard'
+            : 'component',
         position: instance.position,
         data: stableData(instance),
         // 必须把选中状态写回受控节点：React Flow 的 deleteKeyCode 只会删除

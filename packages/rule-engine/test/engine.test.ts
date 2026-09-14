@@ -157,7 +157,7 @@ describe('正确接线（示例项目）', () => {
     expect(RULE_SET_VERSION).toMatch(/^rules-[a-z0-9]+$/);
     const info = getRuleSetInfo();
     expect(info.version).toBe(RULE_SET_VERSION);
-    expect(info.rules.length).toBeGreaterThanOrEqual(20);
+    expect(info.rules.length).toBeGreaterThanOrEqual(21);
     expect(info.rules.find((rule) => rule.code === 'R-01')?.enabled).toBe(true);
   });
 });
@@ -599,6 +599,90 @@ describe('第二批组件与 R-22（负载需驱动模块）', () => {
       wire('pin-esp32-gpio22', 'c-lcd', 'SCL'),
     ]);
     expect(codes(result)).toContain('R-13');
+  });
+});
+
+describe('面包板（简化模型：列即等电位组）', () => {
+  const bb = (): ComponentInstance => instance('c-bb', 'breadboard', '面包板-1');
+
+  it('定义：列端口为 passive 且非必需，电源轨为 power/ground', () => {
+    const def = COMPONENTS.find((item) => item.slug === 'breadboard');
+    expect(def).toBeTruthy();
+    if (!def) return;
+    const columns = def.ports.filter((port) => port.id.startsWith('c'));
+    expect(columns.length).toBeGreaterThanOrEqual(8);
+    expect(columns.every((port) => port.role === 'passive' && !port.required)).toBe(true);
+    expect(def.ports.find((port) => port.id === 'vcc')?.role).toBe('power');
+    expect(def.ports.find((port) => port.id === 'gnd')?.role).toBe('ground');
+    expect(def.renderAs).toBe('breadboard');
+  });
+
+  it('同一列可接 1 个 GPIO 与多个器件（一拖多，且不报 R-23）', () => {
+    const result = run(
+      [bb(), instance('c-led1', 'led', 'LED-1', { seriesResistor: true }), instance('c-led2', 'led', 'LED-2', { seriesResistor: true })],
+      [
+        wire('pin-esp32-gpio4', 'c-bb', 'c1'),
+        wirePorts('c-led1', 'A', 'c-bb', 'c1', 'signal'),
+        wire('pin-esp32-gnd-1', 'c-led1', 'K'),
+        wirePorts('c-led2', 'A', 'c-bb', 'c1', 'signal'),
+        wire('pin-esp32-gnd-1', 'c-led2', 'K'),
+      ],
+    );
+    const list = codes(result);
+    expect(list).not.toContain('R-01');
+    expect(list).not.toContain('R-23');
+  });
+
+  it('LED 经面包板列（列上没有真实电阻）仍须报 R-19 —— 面包板不能顶替限流电阻', () => {
+    const result = run(
+      [bb(), instance('c-led1', 'led', 'LED-1', { seriesResistor: false })],
+      [
+        wire('pin-esp32-gpio4', 'c-bb', 'c1'),
+        wirePorts('c-led1', 'A', 'c-bb', 'c1', 'signal'),
+        wire('pin-esp32-gnd-1', 'c-led1', 'K'),
+      ],
+    );
+    expect(codes(result)).toContain('R-19');
+  });
+
+  it('同一列上串联了真实电阻 → R-19 不报', () => {
+    const result = run(
+      [bb(), instance('c-r1', 'resistor', 'R-1', { resistance: '220Ω' }), instance('c-led1', 'led', 'LED-1', { seriesResistor: false })],
+      [
+        wire('pin-esp32-gpio4', 'c-bb', 'c1'),
+        wirePorts('c-r1', '1', 'c-bb', 'c1', 'signal'),
+        wirePorts('c-r1', '2', 'c-led1', 'A', 'signal'),
+        wire('pin-esp32-gnd-1', 'c-led1', 'K'),
+      ],
+    );
+    expect(codes(result)).not.toContain('R-19');
+  });
+
+  it('两个超声波 ECHO 接在同一列 → R-23（多个输出短接）', () => {
+    const sr04 = (id: string, label: string): ComponentInstance =>
+      instance(id, 'hc-sr04', label, { levelShifted: true, externalSupply: true });
+    const result = run(
+      [bb(), sr04('c-sr04-a', 'HC-SR04-A'), sr04('c-sr04-b', 'HC-SR04-B')],
+      [
+        wire('pin-esp32-gpio16', 'c-bb', 'c1'),
+        wirePorts('c-sr04-a', 'ECHO', 'c-bb', 'c1', 'signal'),
+        wirePorts('c-sr04-b', 'ECHO', 'c-bb', 'c1', 'signal'),
+      ],
+    );
+    const r23 = result.diagnostics.find((item) => item.code === 'R-23');
+    expect(r23?.message).toContain('HC-SR04-A');
+    expect(r23?.message).toContain('HC-SR04-B');
+  });
+
+  it('只接一个输出 → 无 R-23', () => {
+    const result = run(
+      [bb(), instance('c-sr04-a', 'hc-sr04', 'HC-SR04-A', { levelShifted: true, externalSupply: true })],
+      [
+        wire('pin-esp32-gpio16', 'c-bb', 'c1'),
+        wirePorts('c-sr04-a', 'ECHO', 'c-bb', 'c1', 'signal'),
+      ],
+    );
+    expect(codes(result)).not.toContain('R-23');
   });
 });
 

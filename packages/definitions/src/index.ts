@@ -4,6 +4,7 @@
  */
 import type { BoardDef, ComponentCategory, ComponentDef } from '@sim/contracts';
 import { ESP32_DEVKITC_V4 } from './boards/esp32-devkitc-v4';
+import { BREADBOARD } from './components/breadboard';
 import { BUZZER_ACTIVE } from './components/buzzer-active';
 import { BUZZER_PASSIVE } from './components/buzzer-passive';
 import { DC_MOTOR } from './components/dc-motor';
@@ -21,6 +22,7 @@ import { USB_TTL } from './components/usb-ttl';
 
 export {
   ESP32_DEVKITC_V4,
+  BREADBOARD,
   BUZZER_ACTIVE,
   BUZZER_PASSIVE,
   DC_MOTOR,
@@ -55,6 +57,7 @@ export const COMPONENTS: ComponentDef[] = [
   PUSH_BUTTON,
   RESISTOR,
   POWER_3V3,
+  BREADBOARD,
 ];
 
 /** 组件库分组顺序即此对象的键顺序（主控 → 传感器 → 通信 → 显示 → 执行器 → 电源/基础） */

@@ -109,8 +109,8 @@ export const LibraryPanel = () => {
 
       {grouped.length === 0 ? <p className="lib-empty">没有匹配的组件</p> : null}
       <p className="lib-hint">
-        当前组件库：ESP32 主控 + DHT11 / HC-SR04 传感器 + OLED 显示 + LED / 蜂鸣器 / 舵机执行器 +
-        USB-TTL 通信模块 + 按键 / 电阻基础元件（其余组件按产品文档迭代加入）。
+        当前组件库：ESP32 主控 + DHT11 / HC-SR04 传感器 + OLED / LCD1602 显示 + LED / 蜂鸣器 / 舵机 /
+        直流电机执行器 + L298N 驱动 + USB-TTL 通信模块 + 按键 / 电阻 / 电源模块 / 面包板基础元件。
       </p>
     </section>
   );

@@ -897,6 +897,41 @@ const R22_NEEDS_DRIVER: Rule = {
   },
 };
 
+const R23_OUTPUT_SHORT: Rule = {
+  meta: {
+    code: 'R-23',
+    name: '多个输出短接在同一线路',
+    severity: 'warning',
+    scope: 'connection',
+    tags: ['electrical', 'protection'],
+  },
+  /**
+   * 基于 net 判定：同一条线路上出现 ≥2 个"输出型"端口即报警。
+   * 典型场景是面包板同一列上插了两个传感器的输出（如两个超声波 ECHO）。
+   * 注意与 R-03 的分工：R-03 查"开发板引脚被多个器件占用"，本规则查"线路上的多输出"。
+   */
+  run: ({ nets }) => {
+    const out: Diagnostic[] = [];
+    for (const net of nets) {
+      const outputs = net.ports.filter((item) => portOf(item.def, item.portId)?.direction === 'out');
+      if (outputs.length < 2) continue;
+
+      const names = outputs.map(
+        (item) => `${item.instance.label}.${portNameOf(item.def, item.portId)}`,
+      );
+      out.push({
+        code: 'R-23',
+        severity: 'warning',
+        message: `${names.join(' 与 ')} 被接在同一条线路上（多个输出短接）`,
+        suggestion:
+          '同一根线只能有一个器件输出电平，两个输出短接会互相"顶牛"，可能损坏器件。请为每个输出分配独立线路/引脚，或用二极管、缓冲器隔离后再汇总。',
+        targets: outputs.map((item) => portTarget(item.instance.id, item.portId)),
+      });
+    }
+    return out;
+  },
+};
+
 export const RULES: Rule[] = [
   R01_REQUIRED_PORT,
   R03_PIN_MULTIPLE_USE,
@@ -918,4 +953,5 @@ export const RULES: Rule[] = [
   R20_UART_CROSS,
   R21_VOLTAGE_MISMATCH,
   R22_NEEDS_DRIVER,
+  R23_OUTPUT_SHORT,
 ];

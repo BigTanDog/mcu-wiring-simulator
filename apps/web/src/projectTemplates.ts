@@ -137,6 +137,40 @@ export const PROJECT_TEMPLATES: ProjectTemplate[] = [
   },
   // 多组件大项目（放在数组末尾：模板卡片按顺序展示，常规教学模板在前）
   buildLabProject(),
+  {
+    id: 'breadboard-fanout',
+    name: '面包板一拖多',
+    summary:
+      '用面包板的「列」把 1 个 GPIO 分给 3 个 LED —— 一个引脚驱动多路负载的经典做法，同时演示正负电源轨的用法。',
+    highlights: ['面包板分接', '一拖多', '电源轨'],
+    projectName: '示例：面包板一拖多（1 个 GPIO 驱动 3 路 LED）',
+    options: { wifiEnabled: false, mode: 'loose' },
+    instances: [
+      inst('t6-bb', 'breadboard', '面包板-1', 620, 40, {}),
+      inst('t6-r1', 'resistor', 'R-1', 1220, 40, { resistance: '220Ω' }),
+      inst('t6-led1', 'led', 'LED-1', 1460, 40, { seriesResistor: false }),
+      inst('t6-r2', 'resistor', 'R-2', 1220, 300, { resistance: '220Ω' }),
+      inst('t6-led2', 'led', 'LED-2', 1460, 300, { seriesResistor: false }),
+      inst('t6-r3', 'resistor', 'R-3', 1220, 560, { resistance: '220Ω' }),
+      inst('t6-led3', 'led', 'LED-3', 1460, 560, { seriesResistor: false }),
+    ],
+    connections: [
+      // 开发板 → 面包板：1 路信号进第 1 列，3V3/GND 分别进正负轨
+      wire('t6-e1', pin('pin-esp32-gpio4'), port('t6-bb', 'c1'), 'signal'),
+      wire('t6-e2', pin('pin-esp32-3v3'), port('t6-bb', 'vcc'), 'power'),
+      wire('t6-e3', pin('pin-esp32-gnd-1'), port('t6-bb', 'gnd'), 'ground'),
+      // 三条 LED 支路都从「同一列」取信号、从负轨取地（列内等电位）
+      wire('t6-e4', port('t6-r1', '1'), port('t6-bb', 'c1'), 'signal'),
+      wire('t6-e5', port('t6-r1', '2'), port('t6-led1', 'A'), 'signal'),
+      wire('t6-e6', port('t6-led1', 'K'), port('t6-bb', 'gnd'), 'ground'),
+      wire('t6-e7', port('t6-r2', '1'), port('t6-bb', 'c1'), 'signal'),
+      wire('t6-e8', port('t6-r2', '2'), port('t6-led2', 'A'), 'signal'),
+      wire('t6-e9', port('t6-led2', 'K'), port('t6-bb', 'gnd'), 'ground'),
+      wire('t6-e10', port('t6-r3', '1'), port('t6-bb', 'c1'), 'signal'),
+      wire('t6-e11', port('t6-r3', '2'), port('t6-led3', 'A'), 'signal'),
+      wire('t6-e12', port('t6-led3', 'K'), port('t6-bb', 'gnd'), 'ground'),
+    ],
+  },
 ];
 
 /**

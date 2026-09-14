@@ -65,6 +65,7 @@ export const componentDefSchema = z.object({
   requirements: z.array(z.string().min(1).max(40)),
   portOptions: z.array(portOptionDefSchema).optional(),
   description: z.string().min(1).max(300),
+  renderAs: z.enum(['default', 'breadboard']).optional(),
 });
 
 /* ------------------------------ 项目与连线 ------------------------------ */

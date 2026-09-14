@@ -131,6 +131,13 @@ export interface ComponentDef {
   requirements: RequirementKind[];
   portOptions?: PortOptionDef[];
   description: string;
+  /**
+   * 画布渲染形态：
+   *  - `default`（缺省）：按端口列表渲染（左列电源/地，右列信号）；
+   *  - `breadboard`：按孔位网格渲染（面包板这类"列即等电位组"的元件）。
+   * 这是**渲染契约**，不参与规则判定（规则只看端口本身）。
+   */
+  renderAs?: 'default' | 'breadboard';
 }
 
 export interface ComponentInstance {

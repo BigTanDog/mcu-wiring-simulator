@@ -1212,7 +1212,7 @@ button {
   background: var(--panel-soft);
   color: var(--muted);
   font-size: 10.5px;
-  cursor: help;
+  cursor: pointer;
   white-space: nowrap;
 }
 
@@ -1220,6 +1220,13 @@ button {
 .why-tip:focus-visible {
   border-color: var(--primary);
   color: var(--primary);
+}
+
+/* 已固定的「为什么」（再次点击可取消固定） */
+.why-tip.is-pinned {
+  border-color: var(--primary);
+  background: var(--chip-bg);
+  color: var(--chip-fg);
 }
 
 /*
@@ -1231,7 +1238,9 @@ button {
 .why-banner {
   flex-shrink: 0;
   min-height: 84px;
-  max-height: 84px;
+  /* 内容多时可滚动（原写死 84px，长解释会被裁掉）；固定态另给更高上限 */
+  max-height: 26vh;
+  overflow-y: auto;
   margin: 0 12px 8px;
   padding: 8px 11px;
   display: flex;
@@ -1244,6 +1253,36 @@ button {
   font-size: 11.5px;
   line-height: 1.6;
   overflow-y: auto;
+}
+
+/* 固定态：给更高的上限并加标记，方便长时间查看原理 */
+.why-banner.is-pinned {
+  max-height: 40vh;
+  border-left-color: var(--primary-dark);
+  background: var(--panel);
+}
+
+.why-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.why-unpin {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-soft);
+  color: var(--muted);
+  font-size: 10.5px;
+  cursor: pointer;
+}
+
+.why-unpin:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
 }
 
 .why-idle {
@@ -1317,6 +1356,15 @@ button {
   display: flex;
   flex-direction: column;
   gap: 7px;
+}
+
+/*
+  子项禁止收缩：列表本身是可滚动的 flex 容器，若子项允许收缩，
+  内容超出时会被"压扁"（诊断挤成一条细缝）而不是出现滚动条 —— 这是
+  给容器加 min-height: 0 之后引入的副作用，必须同时固定住子项高度。
+*/
+.result-list > * {
+  flex-shrink: 0;
 }
 
 .result-empty {

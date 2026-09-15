@@ -32,11 +32,17 @@ export const ValidationPanel = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [problemsOnly, setProblemsOnly] = useState(false);
   /**
-   * 当前悬停/聚焦的诊断规则码 —— 说明条浮在结果面板上方（绝对定位，不参与布局），
-   * 这样展开说明不会推挤列表、也不会把鼠标"推离"触发区。
+   * 悬停/聚焦时临时显示的说明（移开即消失）。
+   * 说明区是常驻区块（布局恒定），悬停时只替换内容 —— 避免出现/消失推挤列表造成 hover 抖动。
    */
   const [whyCode, setWhyCode] = useState<string | null>(null);
-  const whyDoc = whyCode ? ruleDocOf(whyCode) : undefined;
+  /**
+   * 点击「为什么」后**固定住**的说明：优先于悬停值。
+   * 目的是解决"鼠标一移开说明就没了、长文案来不及看"的问题（用户反馈）。
+   */
+  const [pinnedCode, setPinnedCode] = useState<string | null>(null);
+  const activeCode = pinnedCode ?? whyCode;
+  const whyDoc = activeCode ? ruleDocOf(activeCode) : undefined;
 
   /**
    * 定位前先确认目标仍在画布中：诊断可能来自上一次校验，其间用户可能已
@@ -122,17 +128,22 @@ export const ValidationPanel = () => {
             </>
           )}
           <span className="diag-msg">{item.message}</span>
-          {/* 悬停/聚焦即显示说明（无需点击）；键盘用户可用 Tab 聚焦 */}
+          {/* 悬停即临时显示；点击可把说明固定在上方（再次点击取消固定） */}
           {doc ? (
-            <span
-              className="why-tip"
-              tabIndex={0}
-              title={`${item.code} · ${doc.title}`}
+            <button
+              type="button"
+              className={`why-tip${pinnedCode === item.code ? ' is-pinned' : ''}`}
+              title={
+                pinnedCode === item.code
+                  ? `${item.code} · ${doc.title}（已固定，点击取消）`
+                  : `${item.code} · ${doc.title}（点击固定到上方）`
+              }
+              onClick={() => setPinnedCode((current) => (current === item.code ? null : item.code))}
               onFocus={() => setWhyCode(item.code)}
               onBlur={() => setWhyCode(null)}
             >
-              为什么
-            </span>
+              {pinnedCode === item.code ? '已固定' : '为什么'}
+            </button>
           ) : null}
         </div>
         {item.suggestion ? <div className="diag-sug">建议：{item.suggestion}</div> : null}
@@ -213,12 +224,24 @@ export const ValidationPanel = () => {
         早期实现用绝对定位浮层，会被画布层叠/裁剪影响且会推挤布局导致 hover 抖动。
       */}
       {!collapsed && hasRun && diagnostics.length > 0 ? (
-        <div className="why-banner" aria-live="polite">
-          {whyCode && whyDoc ? (
+        <div className={`why-banner${pinnedCode ? ' is-pinned' : ''}`} aria-live="polite">
+          {activeCode && whyDoc ? (
             <>
-              <strong className="why-title">
-                {whyCode} · {whyDoc.title}
-              </strong>
+              <div className="why-head">
+                <strong className="why-title">
+                  {activeCode} · {whyDoc.title}
+                </strong>
+                {pinnedCode ? (
+                  <button
+                    type="button"
+                    className="why-unpin"
+                    onClick={() => setPinnedCode(null)}
+                    title="取消固定，恢复为悬停显示"
+                  >
+                    取消固定
+                  </button>
+                ) : null}
+              </div>
               <span className="why-line">
                 <em>原理</em>
                 {whyDoc.why}
@@ -227,9 +250,17 @@ export const ValidationPanel = () => {
                 <em>正确做法</em>
                 {whyDoc.howTo}
               </span>
+              {whyDoc.example ? (
+                <span className="why-line">
+                  <em>例外</em>
+                  {whyDoc.example}
+                </span>
+              ) : null}
             </>
           ) : (
-            <span className="why-idle">把鼠标移到任一条诊断上，这里会显示该规则的原理与正确做法</span>
+            <span className="why-idle">
+              把鼠标移到任一条诊断上，这里会显示该规则的原理与正确做法；点「为什么」可固定住慢慢看
+            </span>
           )}
         </div>
       ) : null}

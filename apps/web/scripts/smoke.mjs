@@ -432,6 +432,56 @@ try {
     JSON.stringify(listScroll),
   );
 
+  // 诊断条目不得被 flex 压缩（曾因"容器可滚动 + 子项可收缩"把诊断挤成一条细缝）
+  const diagItemHeights = await page.evaluate(() =>
+    [...document.querySelectorAll('.diag-item, .diag-group')].map((element) =>
+      Math.round(element.getBoundingClientRect().height),
+    ),
+  );
+  check(
+    '诊断条目不被压缩（每条保持正常高度）',
+    diagItemHeights.length > 0 && diagItemHeights.every((height) => height >= 24),
+    JSON.stringify(diagItemHeights),
+  );
+
+  // 规则说明：点击「为什么」固定住（移开鼠标仍保留），再点可取消固定
+  // 注意断言必须校验"出现了具体规则码"：空闲提示文案里也含"原理"二字，用 /原理/ 会假通过
+  const whyTipCount = await page.locator('.why-tip').count();
+  // 上一条断言把列表滚到了底部；这里先滚回顶部，否则点击会自动滚动、
+  // 实际落点会偏到滚动后的其它元素上（表现为"点了没反应"）
+  await page.locator('.result-list').evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  await page.waitForTimeout(200);
+  /*
+    用页面内派发 click，而不是 playwright 的合成点击：
+    该按钮位于可滚动列表内，playwright 点击会先自动滚动，导致 mouseup 落在
+    与 mousedown 不同的元素上，click 事件整条丢失（只有 focus 生效）。
+  */
+  await page.evaluate(() => {
+    const button = document.querySelector('.diag-item .why-tip');
+    button?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  });
+  await page.waitForTimeout(300);
+  const whyAfterClick = await page.locator('.why-banner').innerText();
+  const pinnedBtnAfterClick = await page.locator('.why-tip.is-pinned').count();
+  const firstTipLabel = await page.locator('.why-tip').first().innerText();
+  await page.mouse.move(8, 8);
+  await page.waitForTimeout(400);
+  const whyKeptText = await page.locator('.why-banner').innerText();
+  check(
+    '点击「为什么」说明被固定（移开鼠标仍保留）',
+    /R-\d{2} ·/.test(whyKeptText) && whyKeptText === whyAfterClick,
+    `按钮数=${whyTipCount} 固定态按钮=${pinnedBtnAfterClick} 按钮文案="${firstTipLabel}" 点击后="${whyAfterClick.split('\n')[0]?.slice(0, 34)}" 移开后="${whyKeptText.split('\n')[0]?.slice(0, 34)}"`,
+  );
+  await page.screenshot({ path: `${OUT_DIR}/21-why-pinned.png` });
+
+  await page.locator('.why-unpin').click();
+  await page.mouse.move(8, 8);
+  await page.waitForTimeout(400);
+  const whyIdleText = await page.locator('.why-banner').innerText();
+  check('取消固定后说明恢复为空闲提示', /把鼠标移到/.test(whyIdleText), whyIdleText.slice(0, 24));
+
   // 面包板（简化模型）：孔位网格节点 + 一拖多模板
   await page.getByRole('button', { name: '项目管理' }).click();
   await page.waitForSelector('.template-card', { timeout: 5000 });

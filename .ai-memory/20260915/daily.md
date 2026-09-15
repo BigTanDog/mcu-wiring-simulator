@@ -13,6 +13,13 @@
 - 坑：PowerShell 下 git commit message 含全角引号/破折号会被截断（pathspec 错误）→ 改简洁消息后成功
 - 阻塞：无
 
+## [04:1x] 动作: 诊断列表压扁 + 规则说明可点击固定（提交 357499d，已推送）
+
+- **列表被压扁**：`min-height: 0` 让容器可滚动后，flex 子项仍会收缩 → 诊断被挤成细缝。补 `.result-list > * { flex-shrink: 0 }`（两属性成对）
+- **说明区**：hover 临时显示 + **点击「为什么」固定**（`pinnedCode ?? whyCode`），高度 26vh（固定态 40vh）可滚动；补展示 `example`
+- **测试坑**：playwright 合成点击在可滚动容器内会丢失 click（自动滚动使 mouseup 落点偏移，只剩 focus）→ 用页面内 `dispatchEvent`；宽松正则造成假通过 → 改校验规则码
+- 验证：冒烟 48 项、前端单测 49 例、typecheck 0 error
+
 ## [03:5x] 动作: 浅色主题改暖米白 + 去品牌副标题（提交 d8564a1，已推送）
 
 - 用户偏好：浅色要**暖米白**（护眼，不要纯白/冷灰蓝）、品牌区只留标题

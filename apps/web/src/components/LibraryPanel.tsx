@@ -12,6 +12,7 @@ export const LibraryPanel = () => {
   const instances = useProjectStore((state) => state.instances);
   const collapsedGroups = useProjectStore((state) => state.collapsedGroups);
   const toggleGroup = useProjectStore((state) => state.toggleGroup);
+  const toggleSidebar = useProjectStore((state) => state.toggleSidebar);
   const [query, setQuery] = useState('');
 
   /** 搜索时强制展开所有分类 —— 否则会出现"搜到了组件却看不到" */
@@ -58,7 +59,18 @@ export const LibraryPanel = () => {
 
   return (
     <section className="panel">
-      <h2 className="panel-title">组件库</h2>
+      <div className="panel-head">
+        <h2 className="panel-title">组件库</h2>
+        <button
+          type="button"
+          className="panel-collapse-btn"
+          onClick={toggleSidebar}
+          title="收起侧边栏（给画布更多空间）"
+          aria-label="收起侧边栏"
+        >
+          «
+        </button>
+      </div>
       <input
         className="search-input"
         placeholder="搜索组件（如 OLED / DHT）"

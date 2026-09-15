@@ -236,6 +236,29 @@ try {
   check('分类可再次展开', dhtCardsExpanded > 0, `${dhtCardsCollapsed} → ${dhtCardsExpanded}`);
   await page.screenshot({ path: `${OUT_DIR}/10-library-collapse.png` });
 
+  // 侧边栏收起 / 展开：收起后出现窄条、画布变宽；立即展开恢复（不影响后续断言）
+  const stageWidthBefore = Math.round((await page.locator('.stage').boundingBox())?.width ?? 0);
+  await page.locator('.panel-collapse-btn').click();
+  await page.waitForTimeout(400);
+  const railVisible = await page.locator('.sidebar-rail').isVisible();
+  const collapsedBadge = (await page.locator('.rail-badge').innerText().catch(() => '')).trim();
+  const stageWidthCollapsed = Math.round((await page.locator('.stage').boundingBox())?.width ?? 0);
+  check(
+    '收起侧边栏 → 出现窄条且画布变宽',
+    railVisible && stageWidthCollapsed > stageWidthBefore + 200,
+    `画布 ${stageWidthBefore} → ${stageWidthCollapsed}（窄条=${railVisible} 徽标=${collapsedBadge}）`,
+  );
+  await page.screenshot({ path: `${OUT_DIR}/22-sidebar-collapsed.png` });
+
+  await page.locator('.sidebar-rail').click();
+  await page.waitForTimeout(400);
+  const stageWidthRestored = Math.round((await page.locator('.stage').boundingBox())?.width ?? 0);
+  check(
+    '点击窄条展开侧边栏（画布宽度还原）',
+    Math.abs(stageWidthRestored - stageWidthBefore) < 3,
+    `画布 ${stageWidthCollapsed} → ${stageWidthRestored}`,
+  );
+
   // 11. 规则「为什么」悬停说明
   await page.getByRole('button', { name: /载入示例/ }).click();
   await page.waitForTimeout(500);

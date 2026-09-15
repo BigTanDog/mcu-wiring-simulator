@@ -6,6 +6,7 @@ import { InspectorPanel } from './components/InspectorPanel';
 import { LibraryPanel } from './components/LibraryPanel';
 import { ProjectPanel } from './components/ProjectPanel';
 import { ShortcutsPanel } from './components/ShortcutsPanel';
+import { SidebarRail } from './components/SidebarRail';
 import { TopBar } from './components/TopBar';
 import { useHotkeys } from './hooks/useHotkeys';
 import { useProjectStore } from './store/useProjectStore';
@@ -14,6 +15,7 @@ export default function App() {
   const toast = useProjectStore((state) => state.toast);
   const clearToast = useProjectStore((state) => state.clearToast);
   const theme = useProjectStore((state) => state.theme);
+  const sidebarCollapsed = useProjectStore((state) => state.sidebarCollapsed);
 
   useHotkeys();
 
@@ -33,9 +35,16 @@ export default function App() {
       <div className="app">
         <TopBar />
         <div className="body">
-          <aside className="sidebar">
-            <LibraryPanel />
-            <InspectorPanel />
+          {/* 收起后只渲染窄条（不渲染面板），避免隐藏内容仍参与渲染与订阅 */}
+          <aside className={`sidebar${sidebarCollapsed ? ' is-collapsed' : ''}`}>
+            {sidebarCollapsed ? (
+              <SidebarRail />
+            ) : (
+              <>
+                <LibraryPanel />
+                <InspectorPanel />
+              </>
+            )}
           </aside>
           <CanvasErrorBoundary>
             <CanvasArea />

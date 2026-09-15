@@ -133,6 +133,8 @@ interface ProjectState {
   theme: 'light' | 'dark';
   /** 操作提示是否已被用户手动关闭（persist 保存，关闭后不再出现） */
   hintDismissed: boolean;
+  /** 左侧「组件库 / 检查器」侧边栏是否收起为窄条（persist 保存，收起后画布更宽） */
+  sidebarCollapsed: boolean;
   /** 组件库中被折叠的分类（persist 保存，收起后下次打开仍然收起） */
   collapsedGroups: string[];
   /** 快捷键说明面板是否打开 */
@@ -157,6 +159,8 @@ interface ProjectState {
 
   setTheme: (theme: 'light' | 'dark') => void;
   dismissHint: () => void;
+  /** 收起 / 展开左侧边栏（组件库与检查器） */
+  toggleSidebar: () => void;
   toggleGroup: (key: string) => void;
   setShortcutsOpen: (open: boolean) => void;
   setProjectPanelOpen: (open: boolean) => void;
@@ -262,6 +266,7 @@ export const useProjectStore = create<ProjectState>()(
       toast: null,
       theme: 'light',
       hintDismissed: false,
+      sidebarCollapsed: false,
       collapsedGroups: [],
       shortcutsOpen: false,
       historyPast: [],
@@ -276,6 +281,7 @@ export const useProjectStore = create<ProjectState>()(
 
       setTheme: (theme) => set({ theme }),
       dismissHint: () => set({ hintDismissed: true }),
+      toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
       setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
       toggleGroup: (key) =>
         set((state) => ({
@@ -712,6 +718,7 @@ export const useProjectStore = create<ProjectState>()(
         options: { ...state.options, backendOffline: false },
         theme: state.theme,
         hintDismissed: state.hintDismissed,
+        sidebarCollapsed: state.sidebarCollapsed,
         collapsedGroups: state.collapsedGroups,
         currentProjectId: state.currentProjectId,
         currentRevision: state.currentRevision,

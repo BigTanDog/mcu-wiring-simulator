@@ -52,7 +52,6 @@ export const TopBar = () => {
         <span className="brand-mark">2D</span>
         <div className="brand-text">
           <div className="brand-title">单片机接线仿真与校验平台</div>
-          <div className="brand-sub">前后端分离 · 定义与校验由后端服务提供</div>
         </div>
       </div>
 

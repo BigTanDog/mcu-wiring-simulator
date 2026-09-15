@@ -1,30 +1,34 @@
-/* 亮色主题（默认）：整体亮度已下调，长时间使用不刺眼 */
+/*
+  亮色主题（默认）：**暖米白**色系（不是纯白/冷灰）。
+  长时间盯画布线材时更柔和；文字用暖黑（#2a2621）而非纯黑，进一步降低刺眼感。
+  注意：改这些值后必须跑 `node apps/web/scripts/check-contrast.mjs light` 复核对比度。
+*/
 :root,
 [data-theme='light'] {
-  --bg: #e7ecf3;
-  --panel: #f5f7fb;
-  --panel-soft: #eaeff6;
-  --border: #d3dbe6;
-  --border-strong: #b4c0d0;
-  --text: #1a2434;
-  --muted: #586a80;
+  --bg: #ece7dc;
+  --panel: #f8f5ee;
+  --panel-soft: #efeade;
+  --border: #dad3c4;
+  --border-strong: #beb5a3;
+  --text: #2a2621;
+  --muted: #6b6355;
   --primary: #2f6fed;
   --primary-dark: #1d4ed8;
-  --error: #d32f2f;
-  --warning: #c2740a;
-  --success: #05795a;
+  --error: #c0392b;
+  --warning: #a86606;
+  --success: #0a6b52;
 
-  --chip-bg: #e6ecfb;
+  --chip-bg: #e7e0d1;
   --chip-fg: #1d4ed8;
-  --ok-bg: #e7f7f0;
-  --ok-fg: #05795a;
-  --warn-bg: #fdf3e3;
-  --warn-fg: #a35f07;
-  --err-bg: #fdeaea;
-  --overlay: rgba(245, 247, 251, 0.97);
-  --canvas-dot: #b9c4d4;
-  --diag-error-bg: #fbf3f3;
-  --diag-warning-bg: #fbf7ee;
+  --ok-bg: #e9f4ec;
+  --ok-fg: #0a6b52;
+  --warn-bg: #fbf3e2;
+  --warn-fg: #8f5606;
+  --err-bg: #fbeceb;
+  --overlay: rgba(248, 245, 238, 0.97);
+  --canvas-dot: #c7bead;
+  --diag-error-bg: #fbf2f0;
+  --diag-warning-bg: #fbf6e9;
 
   --cap-gpio: #2f6fed;
   --cap-input: #0e7490;
@@ -185,7 +189,6 @@ button {
 }
 
 @media (max-width: 1240px) {
-  .brand-sub,
   .topbar .chip-muted {
     display: none;
   }
@@ -220,10 +223,7 @@ button {
   font-weight: 600;
 }
 
-.brand-sub {
-  font-size: 11px;
-  color: var(--muted);
-}
+/* .brand-sub 已移除（用户要求精简品牌区文案） */
 
 .project-name {
   width: 200px;

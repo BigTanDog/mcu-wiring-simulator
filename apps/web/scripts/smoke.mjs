@@ -451,6 +451,36 @@ try {
   await page.waitForTimeout(300);
   const bbStatus = await page.locator('.result-status').innerText();
   check('面包板一拖多模板校验无错误', !/存在错误/.test(bbStatus), bbStatus);
+
+  // 版式修复：列接线点必须与列严格对齐（否则"看不出线连到哪"）
+  const alignment = await page.evaluate(() => {
+    const columns = [...document.querySelectorAll('.bb-col')];
+    const handles = [...document.querySelectorAll('.bb-col-handle')];
+    if (columns.length === 0 || columns.length !== handles.length) {
+      return { ok: false, detail: `数量不一致（列 ${columns.length} / 接线点 ${handles.length}）` };
+    }
+    const deltas = columns.map((column, index) => {
+      const a = column.getBoundingClientRect();
+      const b = handles[index].getBoundingClientRect();
+      return Math.abs(a.left + a.width / 2 - (b.left + b.width / 2));
+    });
+    const worst = Math.max(...deltas);
+    return { ok: worst < 3, detail: `最大偏差 ${worst.toFixed(1)}px` };
+  });
+  check('面包板列接线点与所在列对齐', alignment.ok, alignment.detail);
+
+  // 组件节点文案修复：电阻应显示中文名与阻值，且不出现无关的"未接上拉"
+  const resistorText = await page
+    .locator('.react-flow__node')
+    .filter({ hasText: 'R-1' })
+    .first()
+    .innerText();
+  check(
+    '电阻节点显示中文名/阻值且无无关徽标',
+    /电阻（1\/4W）/.test(resistorText) && /220Ω/.test(resistorText) && !/未接上拉/.test(resistorText),
+    resistorText.replace(/\n/g, ' | '),
+  );
+
   await page.screenshot({ path: `${OUT_DIR}/20-breadboard.png` });
 
   await page.getByRole('button', { name: /运行/ }).click();

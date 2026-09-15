@@ -67,7 +67,24 @@ export const ComponentNode = memo(function ComponentNode(props: NodeProps) {
   };
 
   const address = instance ? String(instance.portConfig.address ?? '') : '';
+  /**
+   * 只显示组件「确实声明了」的选项：之前无条件渲染"已接上拉/未接上拉"，
+   * 导致电阻、面包板这类没有上拉概念的元件也被标上"未接上拉"（误导）。
+   */
+  const pullupOption = def.portOptions?.find((option) => option.key === 'pullup');
+  const resistanceOption = def.portOptions?.find((option) => option.key === 'resistance');
   const pullup = instance ? instance.portConfig.pullup === true : false;
+  const resistance = instance
+    ? String(instance.portConfig.resistance ?? resistanceOption?.defaultValue ?? '')
+    : '';
+
+  /**
+   * 型号行：去掉 displayName 开头的型号前缀，只留中文名。
+   * 注意不能用 `split(' ').slice(1)` —— 像「电阻（1/4W）」这种没有空格的名称会被切空，
+   * 之前因此退化成 slug（画布上显示 "resistor"，与组件库里的"电阻（1/4W）"对不上）。
+   */
+  const modelLabel =
+    def.displayName.replace(/^[A-Za-z0-9][A-Za-z0-9+\-./ ]*/, '').trim() || def.displayName;
 
   return (
     <div
@@ -81,11 +98,16 @@ export const ComponentNode = memo(function ComponentNode(props: NodeProps) {
       <div className="component-body">
         <div className="port-column">{leftPorts.map((port) => renderPort(port, 'left'))}</div>
         <div className="component-core">
-          <div className="component-model">{def.displayName.split(' ').slice(1).join(' ') || def.slug}</div>
+          <div className="component-model">{modelLabel}</div>
           {address ? <div className="component-badge">I2C {address}</div> : null}
-          <div className={`component-badge${pullup ? '' : ' badge-warn'}`}>
-            {pullup ? '已接上拉' : '未接上拉'}
-          </div>
+          {resistanceOption && resistance ? (
+            <div className="component-badge">{resistance}</div>
+          ) : null}
+          {pullupOption ? (
+            <div className={`component-badge${pullup ? '' : ' badge-warn'}`}>
+              {pullup ? '已接上拉' : '未接上拉'}
+            </div>
+          ) : null}
         </div>
         <div className="port-column">{rightPorts.map((port) => renderPort(port, 'right'))}</div>
       </div>

@@ -1493,7 +1493,12 @@ button {
 }
 
 /* ------------------------------ 面包板节点 ------------------------------ */
-/* 简化模型：每列一个等电位组，视觉上画两个孔说明"列内互通" */
+/*
+  简化模型：每列一个等电位组。
+  版式要点：**所有接线点都落在节点边缘**（电源轨在左右、列接线点在下边缘），
+  这样连线从边缘引出，不会被不透明的板体挡住（早期把列 Handle 放在列上方，
+  正好被"+ 电源轨"覆盖，导致"看不出线连到哪"）。
+*/
 
 .breadboard-node {
   width: 468px;
@@ -1523,43 +1528,80 @@ button {
   font-size: 10px;
 }
 
+/* 左右两侧的电源轨 + 中间孔位区 */
+.bb-main {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
 .bb-rail {
   position: relative;
+  width: 30px;
   display: grid;
   place-items: center;
-  height: 24px;
   border-radius: 6px;
   background: var(--panel);
   box-shadow: inset 0 0 0 1px var(--border);
 }
 
-/* Handle 定位覆盖：React Flow 默认把 Handle 放在节点边缘，这里改为各自列/轨的正上方 */
-.bb-rail-handle,
-.bb-col-handle {
-  left: 50% !important;
-  top: -4px !important;
-  transform: translate(-50%, -50%) !important;
+.bb-rail-text {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--muted);
 }
 
-.bb-rail-text {
-  font-size: 10.5px;
-  color: var(--muted);
+/* 电源轨 Handle 落在节点左 / 右边缘的中点 */
+.bb-rail-handle {
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+}
+
+.bb-rail-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+
+.bb-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .bb-grid {
   display: grid;
   grid-template-columns: repeat(12, 1fr);
   gap: 4px;
-  margin: 10px 0;
+}
+
+/* 列接线点层：与孔位列共用同一套 grid（保证上下严格对齐），本身不占高度 */
+.bb-grid-handles {
+  margin-top: 3px;
+}
+
+.bb-handle-cell {
+  position: relative;
+  height: 0;
+}
+
+/* 列接线点：挂在节点下边缘，位于所在列的正下方 */
+.bb-col-handle {
+  left: 50% !important;
+  bottom: -6px !important;
+  transform: translateX(-50%) !important;
 }
 
 .bb-col {
-  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  padding: 7px 0 3px;
+  padding: 7px 0 4px;
   border-radius: 5px;
   background: var(--panel);
   box-shadow: inset 0 0 0 1px var(--border);

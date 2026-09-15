@@ -482,6 +482,34 @@ try {
   const whyIdleText = await page.locator('.why-banner').innerText();
   check('取消固定后说明恢复为空闲提示', /把鼠标移到/.test(whyIdleText), whyIdleText.slice(0, 24));
 
+  /*
+    防抖：鼠标停在诊断标题上时，布局与说明内容必须稳定。
+    曾因说明区改用可变高度（max-height）→ 悬停时内容变多把列表推下去 →
+    鼠标相对位置偏移导致反复触发 onMouseLeave/onMouseEnter → 疯狂抖动。
+  */
+  const readHoverState = () =>
+    page.evaluate(() => ({
+      bannerHeight: Math.round(
+        document.querySelector('.why-banner')?.getBoundingClientRect().height ?? 0,
+      ),
+      bannerText: (document.querySelector('.why-banner')?.innerText ?? '').slice(0, 24),
+      listTop: Math.round(
+        document.querySelector('.diag-item')?.getBoundingClientRect().top ?? 0,
+      ),
+    }));
+  await page.locator('.diag-head').first().hover();
+  await page.waitForTimeout(400);
+  const hoverA = await readHoverState();
+  await page.waitForTimeout(700);
+  const hoverB = await readHoverState();
+  check(
+    '悬停诊断标题不抖动（说明区高度与列表位置稳定）',
+    hoverA.bannerHeight === hoverB.bannerHeight &&
+      hoverA.bannerText === hoverB.bannerText &&
+      hoverA.listTop === hoverB.listTop,
+    `A=${JSON.stringify(hoverA)} B=${JSON.stringify(hoverB)}`,
+  );
+
   // 面包板（简化模型）：孔位网格节点 + 一拖多模板
   await page.getByRole('button', { name: '项目管理' }).click();
   await page.waitForSelector('.template-card', { timeout: 5000 });

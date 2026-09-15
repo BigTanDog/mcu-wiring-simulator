@@ -13,6 +13,14 @@
 - 坑：PowerShell 下 git commit message 含全角引号/破折号会被截断（pathspec 错误）→ 改简洁消息后成功
 - 阻塞：无
 
+## [03:5x] 动作: 浅色主题改暖米白 + 去品牌副标题（提交 d8564a1，已推送）
+
+- 用户偏好：浅色要**暖米白**（护眼，不要纯白/冷灰蓝）、品牌区只留标题
+- 中性色系整体调暖（bg/panel/panel-soft/border/text/muted/overlay/canvas-dot/chip/diag），text 用暖黑 `#2a2621`；主色与语义色保留
+- 移除副标题小字 + 样式与窄屏规则
+- 验证：check-contrast light **0 项**、冒烟 45 项、typecheck 0 error
+- **推送已恢复**：连同积压的 9d70842 / bdc8976 一起推送成功，本地与远端同步
+
 ## [03:3x] 动作: 面包板版式改版 + 组件节点文案修复（提交 9d70842，**待推送**）
 
 - 用户截图反馈两问题，均为真 bug：
